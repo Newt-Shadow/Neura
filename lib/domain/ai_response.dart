@@ -2,22 +2,25 @@ enum AIResponseType { question, plan }
 
 class AIResponse {
   final AIResponseType type;
-  final String message; // The question OR the motivation
-  final List<dynamic>? actions; // Null if it's just a question
-  final Map<String, String>? profileUpdates; // New facts learned about user
+  final String message;
+  final List<dynamic>? actions;
+  final List<String>? options; // <--- NEW: Stores dynamic MCQs
+  final Map<String, String>? profileUpdates;
 
   AIResponse({
     required this.type,
     required this.message,
     this.actions,
+    this.options,
     this.profileUpdates,
   });
 
   factory AIResponse.fromJson(Map<String, dynamic> json) {
     return AIResponse(
-      type: json['type'] == 'question' ? AIResponseType.question : AIResponseType.plan,
-      message: json['content'] ?? "Let's do this!",
-      actions: json['plan']?['actions'],
+      type: json['type'] == 'options' ? AIResponseType.question : AIResponseType.plan, // 'options' = question type
+      message: json['question'] ?? json['motivation'] ?? json['content'] ?? "Ready?",
+      actions: json['actions'], // For Plans
+      options: json['options'] != null ? List<String>.from(json['options']) : null, // For MCQs
       profileUpdates: json['learnings'] != null 
           ? Map<String, String>.from(json['learnings']) 
           : null,

@@ -1,5 +1,5 @@
 name: neuro
-description: "Applicazione AI offline per neuro, sviluppata da Guido Marangoni."
+description: "Neuro"
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
@@ -30,6 +30,11 @@ dependencies:
   image: ^4.2.0
   google_generative_ai: ^0.4.4
   confetti: ^0.7.0
+  firebase_core: ^2.24.2
+  firebase_auth: ^4.16.0
+  google_sign_in: ^6.1.6
+  flutter_secure_storage: ^9.0.0 # For saving the API Key safely
+  cloud_firestore: ^4.14.0       # To save patient details
 
 
 dev_dependencies:

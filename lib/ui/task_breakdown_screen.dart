@@ -27,26 +27,30 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
   final stt.SpeechToText _speech = stt.SpeechToText();
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  
+  Uint8List? _pendingImageBytes;
+
   bool _isListening = false;
   bool _isLoading = false;
   String _statusMessage = "";
-  
+
   Uint8List? _attachedImageBytes;
   bool _isVideo = false;
-  String? _attachmentName; 
+  String? _attachmentName;
 
   // --- DUAL MODE STATE ---
   bool _isTaskMode = true; // true = Task Agent, false = Normal Chat
-  List<Map<String, String>> _chatMessages = []; 
+  List<Map<String, String>> _chatMessages = [];
 
   // Session State
-  dynamic _activeChat; 
+  dynamic _activeChat;
   List<String>? _clarificationOptions;
   String? _clarificationQuestion;
 
   String _maskPII(String input) {
-    return input.replaceAll(RegExp(r"[\w-\.]+@([\w-]+\.)+[\w-]{2,4}"), "[EMAIL]");
+    return input.replaceAll(
+      RegExp(r"[\w-\.]+@([\w-]+\.)+[\w-]{2,4}"),
+      "[EMAIL]",
+    );
   }
 
   // --- IMAGE OPTIMIZATION ---
@@ -54,12 +58,13 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     try {
       final cmd = img.decodeImage(rawBytes);
       if (cmd == null) return rawBytes;
-      if (cmd.width > 800 || cmd.height > 800) { 
-         final resized = img.copyResize(cmd, 
-           width: cmd.width > cmd.height ? 800 : null, 
-           height: cmd.height > cmd.width ? 800 : null
-         );
-         return Uint8List.fromList(img.encodeJpg(resized, quality: 75));
+      if (cmd.width > 800 || cmd.height > 800) {
+        final resized = img.copyResize(
+          cmd,
+          width: cmd.width > cmd.height ? 800 : null,
+          height: cmd.height > cmd.width ? 800 : null,
+        );
+        return Uint8List.fromList(img.encodeJpg(resized, quality: 75));
       }
       return rawBytes;
     } catch (e) {
@@ -79,17 +84,37 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
               title: const Text('Gallery'),
               onTap: () async {
                 Navigator.pop(ctx);
-                final XFile? media = await _picker.pickImage(source: ImageSource.gallery);
+                final XFile? media = await _picker.pickImage(
+                  source: ImageSource.gallery,
+                );
                 if (media != null) {
                   if (!_isTaskMode) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Switched to Task Mode for Image Analysis")));
-                    setState(() { _isTaskMode = true; _resetSession(); });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          "Switched to Task Mode for Image Analysis",
+                        ),
+                      ),
+                    );
+                    setState(() {
+                      _isTaskMode = true;
+                      _resetSession();
+                    });
                   }
-                  _resetSession(); 
-                  setState(() { _isLoading = true; _statusMessage = "Optimizing..."; });
+                  _resetSession();
+                  setState(() {
+                    _isLoading = true;
+                    _statusMessage = "Optimizing...";
+                  });
                   final bytes = await media.readAsBytes();
                   final compressed = await _compressImage(bytes);
-                  setState(() { _attachedImageBytes = compressed; _attachmentName = "Image attached"; _isVideo = false; _clarificationOptions = null; _isLoading = false; });
+                  setState(() {
+                    _attachedImageBytes = compressed;
+                    _attachmentName = "Image attached";
+                    _isVideo = false;
+                    _clarificationOptions = null;
+                    _isLoading = false;
+                  });
                   _processRequest(imageBytes: compressed);
                 }
               },
@@ -99,16 +124,30 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
               title: const Text('Camera'),
               onTap: () async {
                 Navigator.pop(ctx);
-                final XFile? media = await _picker.pickImage(source: ImageSource.camera);
+                final XFile? media = await _picker.pickImage(
+                  source: ImageSource.camera,
+                );
                 if (media != null) {
                   if (!_isTaskMode) {
-                    setState(() { _isTaskMode = true; _resetSession(); });
+                    setState(() {
+                      _isTaskMode = true;
+                      _resetSession();
+                    });
                   }
                   _resetSession();
-                  setState(() { _isLoading = true; _statusMessage = "Optimizing..."; });
+                  setState(() {
+                    _isLoading = true;
+                    _statusMessage = "Optimizing...";
+                  });
                   final bytes = await media.readAsBytes();
                   final compressed = await _compressImage(bytes);
-                  setState(() { _attachedImageBytes = compressed; _attachmentName = "Photo taken"; _isVideo = false; _clarificationOptions = null; _isLoading = false; });
+                  setState(() {
+                    _attachedImageBytes = compressed;
+                    _attachmentName = "Photo taken";
+                    _isVideo = false;
+                    _clarificationOptions = null;
+                    _isLoading = false;
+                  });
                   _processRequest(imageBytes: compressed);
                 }
               },
@@ -136,13 +175,13 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
           onResult: (val) {
             setState(() => _textController.text = val.recognizedWords);
             if (val.finalResult) {
-               setState(() => _isListening = false);
-               _sendMessage(); 
+              setState(() => _isListening = false);
+              _sendMessage();
             }
           },
         );
       } else {
-        openAppSettings(); 
+        openAppSettings();
       }
     } else {
       setState(() => _isListening = false);
@@ -153,17 +192,36 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
   void _sendMessage() {
     final text = _textController.text.trim();
     if (text.isEmpty && _attachedImageBytes == null) return;
-    
-    _speech.stop(); 
+
+    _speech.stop();
     _textController.clear();
 
     if (_isTaskMode) {
       if (_clarificationOptions != null) {
-         _processRequest(textInput: text, forcePlan: true);
+        _processRequest(
+          textInput: text,
+          imageBytes: _pendingImageBytes, // <--- FIX: Resend the image
+          forcePlan: true,
+        );
+
+        // Cleanup after plan is requested
+        _pendingImageBytes = null;
+        setState(() {
+          _clarificationOptions = null;
+        });
       } else {
-         _processRequest(textInput: text, imageBytes: _attachedImageBytes);
+        if (_attachedImageBytes != null) {
+          _pendingImageBytes = _attachedImageBytes;
+        }
+        _processRequest(textInput: text, imageBytes: _attachedImageBytes);
       }
-      setState(() { _attachedImageBytes = null; _attachmentName = null; _isListening = false; _clarificationOptions = null; });
+
+      // Clear the input preview, but _pendingImageBytes keeps the data alive logic-side
+      setState(() {
+        _attachedImageBytes = null;
+        _attachmentName = null;
+        _isListening = false;
+      });
     } else {
       _processNormalChat(text);
     }
@@ -176,10 +234,15 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
       _isLoading = true;
       _statusMessage = "Typing...";
     });
-    
+
     // Scroll to bottom
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) _scrollController.animateTo(_scrollController.position.maxScrollExtent, duration: 300.ms, curve: Curves.easeOut);
+      if (_scrollController.hasClients)
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: 300.ms,
+          curve: Curves.easeOut,
+        );
     });
 
     try {
@@ -187,14 +250,17 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
         _activeChat = await ModelHolder.createChat();
         final settings = context.read<NeuroSettings>();
         // Initialize conversational persona
-        await _activeChat.addQueryChunk(Message.text(
-          text: "System: You are a friendly companion for ${settings.userName}. Keep answers short, encouraging, and helpful. Do NOT output JSON.", 
-          isUser: true
-        ));
+        await _activeChat.addQueryChunk(
+          Message.text(
+            text:
+                "System: You are a friendly companion for ${settings.userName}. Keep answers short, encouraging, and helpful. Do NOT output JSON.",
+            isUser: true,
+          ),
+        );
       }
 
       await _activeChat.addQueryChunk(Message.text(text: text, isUser: true));
-      
+
       String botResponse = "";
       await for (final token in _activeChat.generateChatResponseAsync()) {
         botResponse += token;
@@ -204,14 +270,21 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
         _chatMessages.add({'role': 'ai', 'text': botResponse});
         _isLoading = false;
       });
-      
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) _scrollController.animateTo(_scrollController.position.maxScrollExtent, duration: 300.ms, curve: Curves.easeOut);
-      });
 
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients)
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: 300.ms,
+            curve: Curves.easeOut,
+          );
+      });
     } catch (e) {
       setState(() {
-        _chatMessages.add({'role': 'ai', 'text': "Sorry, I got confused. ($e)"});
+        _chatMessages.add({
+          'role': 'ai',
+          'text': "Sorry, I got confused. ($e)",
+        });
         _isLoading = false;
       });
     }
@@ -222,33 +295,30 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
   Future<void> _processRequest({String? textInput, Uint8List? imageBytes, bool forcePlan = false}) async {
     setState(() { 
       _isLoading = true; 
-      _statusMessage = forcePlan ? "Drafting Plan..." : "Consulting Cloud Brain..."; 
-      _clarificationOptions = null; 
+      _statusMessage = forcePlan ? "Drafting Plan..." : "Analyzing Scene..."; 
     });
 
     try {
-      // 1. USE THE CLOUD BRAIN (RemoteAIService)
-      // This uses the smart Gemini model + Your "Neuro-Inclusive" System Prompt
       final response = await RemoteAIService.processRequest(
         userQuery: textInput ?? (forcePlan ? "Create the plan." : ""), 
-        imageBytes: imageBytes,
+        imageBytes: imageBytes, 
         userSettings: context.read<NeuroSettings>(),
       );
 
-      // 2. HANDLE THE RESPONSE
-      if (response == null) {
-        throw Exception("Weak connection to Cloud Brain.");
-      }
+      if (response == null) throw Exception("Brain fog. Try again.");
 
       if (response.type == AIResponseType.question) {
-        // Case A: The AI needs clarification (e.g., "Cleaning or Packing?")
+        // CASE A: DYNAMIC OPTIONS RETURNED BY AI
         setState(() {
           _clarificationQuestion = response.message;
-          // Create simple options if none provided, or use logic to parse them if your API supports it
-          _clarificationOptions = ["Cleaning", "Organizing", "Just finding an item"]; 
+          // Use the options from the AI, or fallback if empty
+          _clarificationOptions = (response.options != null && response.options!.isNotEmpty)
+              ? response.options 
+              : ["Clean", "Organize", "Declutter"]; 
         });
       } else {
-        // Case B: Plan is Ready -> Go to Interactive Screen
+        // CASE B: PLAN READY
+        if (!mounted) return;
         Navigator.push(
           context, 
           MaterialPageRoute(builder: (_) => InteractiveTaskScreen(
@@ -256,6 +326,8 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
             motivation: response.message,
             onReset: () { 
               Navigator.pop(context);
+              // Clear pending image when we return to start fresh
+              _pendingImageBytes = null; 
             }
           ))
         );
@@ -274,7 +346,7 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
   void _handleResponse(String response) {
     try {
       final data = json.decode(response);
-      
+
       if (data['type'] == 'options') {
         setState(() {
           _clarificationQuestion = data['question'];
@@ -287,26 +359,28 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
         final String motivation = data['motivation'] ?? "You can do this!";
 
         Navigator.push(
-          context, 
-          MaterialPageRoute(builder: (_) => InteractiveTaskScreen(
-            initialTasks: tasks,      // Pass List
-            motivation: motivation,   // Pass String
-            onReset: () { 
-              Navigator.pop(context);
-              // Keeps the chat history alive if they come back
-            }
-          ))
+          context,
+          MaterialPageRoute(
+            builder: (_) => InteractiveTaskScreen(
+              initialTasks: tasks, // Pass List
+              motivation: motivation, // Pass String
+              onReset: () {
+                Navigator.pop(context);
+                // Keeps the chat history alive if they come back
+              },
+            ),
+          ),
         );
       }
     } catch (e) {
       print("JSON Logic Error: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Could not read plan. Try again."))
+        SnackBar(content: Text("Could not read plan. Try again.")),
       );
     }
   }
 
-// ... rest of the file remains the same ...
+  // ... rest of the file remains the same ...
 
   String? _robustJsonExtractor(String input) {
     int start = input.indexOf('{');
@@ -316,7 +390,9 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
       try {
         json.decode(candidate);
         return candidate;
-      } catch (e) { return null; }
+      } catch (e) {
+        return null;
+      }
     }
     return null;
   }
@@ -344,14 +420,10 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
         centerTitle: true,
       ),
       // Fixes the keyboard overlap issue
-      resizeToAvoidBottomInset: true, 
+      resizeToAvoidBottomInset: true,
       body: Column(
         children: [
-          Expanded(
-            child: _isTaskMode 
-              ? _buildTaskView() 
-              : _buildChatView(),
-          ),
+          Expanded(child: _isTaskMode ? _buildTaskView() : _buildChatView()),
           if (_attachmentName != null && _isTaskMode) _buildAttachmentBanner(),
           _buildInputBar(),
         ],
@@ -366,7 +438,7 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
         if (_isTaskMode != isTask) {
           setState(() {
             _isTaskMode = isTask;
-            _resetSession(); 
+            _resetSession();
           });
         }
       },
@@ -404,7 +476,13 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
       itemCount: _chatMessages.length + (_isLoading ? 1 : 0),
       itemBuilder: (ctx, i) {
         if (i == _chatMessages.length) {
-          return const Align(alignment: Alignment.centerLeft, child: Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator()));
+          return const Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: EdgeInsets.all(8),
+              child: CircularProgressIndicator(),
+            ),
+          );
         }
         final msg = _chatMessages[i];
         final isUser = msg['role'] == 'user';
@@ -428,38 +506,119 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
   }
 
   Widget _buildLoadingView() {
-    return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      const CircularProgressIndicator(), const SizedBox(height: 20),
-      Text(_statusMessage, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
-    ]));
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 20),
+          Text(
+            _statusMessage,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.teal,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildEmptyState(String text) {
-    return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      Icon(_isTaskMode ? Icons.psychology : Icons.chat, size: 80, color: Colors.grey), 
-      const SizedBox(height: 16),
-      Text(text, style: const TextStyle(fontSize: 20, color: Colors.grey)),
-    ]));
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            _isTaskMode ? Icons.psychology : Icons.chat,
+            size: 80,
+            color: Colors.grey,
+          ),
+          const SizedBox(height: 16),
+          Text(text, style: const TextStyle(fontSize: 20, color: Colors.grey)),
+        ],
+      ),
+    );
   }
 
   Widget _buildOptionsView() {
-    return Center(child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: Column(children: [
-      const Icon(Icons.help_outline, size: 60, color: Colors.orange),
-      const SizedBox(height: 16),
-      Text(_clarificationQuestion ?? "Choose an option:", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-      const SizedBox(height: 32),
-      ..._clarificationOptions!.map((option) => Padding(padding: const EdgeInsets.only(bottom: 16), child: SizedBox(height: 70, child: ElevatedButton(
-        style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.teal, elevation: 4, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Colors.teal, width: 1.5))),
-        onPressed: () => _processRequest(textInput: option, forcePlan: true),
-        child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Expanded(child: Text(option, style: const TextStyle(fontSize: 18))), const Icon(Icons.arrow_forward_ios, size: 16)]),
-      )))).toList(),
-    ])));
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            const Icon(Icons.help_outline, size: 60, color: Colors.orange),
+            const SizedBox(height: 16),
+            Text(
+              _clarificationQuestion ?? "Choose an option:",
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            ..._clarificationOptions!
+                .map(
+                  (option) => Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: SizedBox(
+                      height: 70,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.teal,
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: const BorderSide(
+                              color: Colors.teal,
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                        onPressed: () =>
+                            _processRequest(textInput: option, forcePlan: true),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                option,
+                                style: const TextStyle(fontSize: 18),
+                              ),
+                            ),
+                            const Icon(Icons.arrow_forward_ios, size: 16),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildAttachmentBanner() {
-    return Container(color: Colors.teal.shade50, padding: const EdgeInsets.all(12), child: Row(children: [
-      const Icon(Icons.check, color: Colors.teal), const SizedBox(width: 8), Text(_attachmentName!), const Spacer(), IconButton(icon: const Icon(Icons.close), onPressed: () => setState(() { _attachedImageBytes = null; _attachmentName = null; }))
-    ]));
+    return Container(
+      color: Colors.teal.shade50,
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: [
+          const Icon(Icons.check, color: Colors.teal),
+          const SizedBox(width: 8),
+          Text(_attachmentName!),
+          const Spacer(),
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () => setState(() {
+              _attachedImageBytes = null;
+              _attachmentName = null;
+            }),
+          ),
+        ],
+      ),
+    );
   }
 
   // FIXED INPUT BAR (SafeArea Logic)
@@ -475,15 +634,28 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
           child: Row(
             children: [
-              if (_isTaskMode) IconButton(icon: const Icon(Icons.add_a_photo_outlined, color: Colors.grey), onPressed: _pickAttachment),
+              if (_isTaskMode)
+                IconButton(
+                  icon: const Icon(
+                    Icons.add_a_photo_outlined,
+                    color: Colors.grey,
+                  ),
+                  onPressed: _pickAttachment,
+                ),
               Expanded(
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(24)),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
                   child: TextField(
                     controller: _textController,
-                    onChanged: (val) => setState(() {}), 
-                    decoration: const InputDecoration(hintText: "Message...", border: InputBorder.none),
+                    onChanged: (val) => setState(() {}),
+                    decoration: const InputDecoration(
+                      hintText: "Message...",
+                      border: InputBorder.none,
+                    ),
                   ),
                 ),
               ),
@@ -491,9 +663,20 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
               FloatingActionButton(
                 mini: true,
                 elevation: 0,
-                backgroundColor: (_textController.text.isNotEmpty || _attachmentName != null) ? Colors.teal : (_isListening ? Colors.redAccent : Colors.teal),
-                onPressed: (_textController.text.isNotEmpty || _attachmentName != null) ? _sendMessage : _toggleVoice,
-                child: Icon((_textController.text.isNotEmpty || _attachmentName != null) ? Icons.arrow_upward : (_isListening ? Icons.stop : Icons.mic), color: Colors.white),
+                backgroundColor:
+                    (_textController.text.isNotEmpty || _attachmentName != null)
+                    ? Colors.teal
+                    : (_isListening ? Colors.redAccent : Colors.teal),
+                onPressed:
+                    (_textController.text.isNotEmpty || _attachmentName != null)
+                    ? _sendMessage
+                    : _toggleVoice,
+                child: Icon(
+                  (_textController.text.isNotEmpty || _attachmentName != null)
+                      ? Icons.arrow_upward
+                      : (_isListening ? Icons.stop : Icons.mic),
+                  color: Colors.white,
+                ),
               ),
             ],
           ),
