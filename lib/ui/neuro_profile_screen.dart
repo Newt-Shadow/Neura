@@ -23,6 +23,7 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
     _nameController.text = settings.userName;
     _diagnosisController.text = settings.diagnosis;
     _sensoryController.text = settings.sensorySensitivities;
+    
     if (_languages.contains(settings.preferredLanguage)) {
       _selectedLanguage = settings.preferredLanguage;
     }
@@ -31,12 +32,13 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<NeuroSettings>();
+    
     return Scaffold(
       appBar: AppBar(title: const Text("My Profile")),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          const Text("About Me (Stored Locally)", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal)),
+          const Text("About Me (Encrypted & Synced)", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal)),
           const SizedBox(height: 16),
           
           TextField(controller: _nameController, decoration: const InputDecoration(labelText: "Name", border: OutlineInputBorder())),
@@ -52,24 +54,38 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
 
           TextField(
             controller: _diagnosisController,
-            decoration: const InputDecoration(labelText: "Diagnosis (Optional)", hintText: "ADHD, Autism, etc.", border: OutlineInputBorder()),
+            decoration: const InputDecoration(labelText: "Diagnosis", hintText: "ADHD, Autism...", border: OutlineInputBorder()),
           ),
           const SizedBox(height: 16),
           
           TextField(
             controller: _sensoryController,
             maxLines: 2,
-            decoration: const InputDecoration(labelText: "Sensory Triggers", hintText: "Loud noises, bright lights, textures...", border: OutlineInputBorder()),
+            decoration: const InputDecoration(labelText: "Sensory Triggers", hintText: "Loud noises, bright lights...", border: OutlineInputBorder()),
           ),
           
           const SizedBox(height: 32),
-          const Text("App Preferences", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal)),
-          SwitchListTile(title: const Text("Dyslexic-Friendly Font"), value: settings.useDyslexicFont, onChanged: (val) => settings.toggleFont()),
-          SwitchListTile(title: const Text("High Contrast Mode"), value: settings.highContrast, onChanged: (val) => settings.toggleContrast()),
+          const Text("Accessibility", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal)),
+          
+          SwitchListTile(
+            title: const Text("Dyslexic-Friendly Font"), 
+            value: settings.useDyslexicFont, 
+            onChanged: (val) => settings.toggleFont()
+          ),
+          SwitchListTile(
+            title: const Text("High Contrast Mode"), 
+            value: settings.highContrast, 
+            onChanged: (val) => settings.toggleContrast()
+          ),
           
           const SizedBox(height: 20),
-          const Text("Task Detail Level"),
-          Slider(value: settings.taskGranularity, divisions: 2, label: settings.taskGranularity == 0.0 ? "Simple" : "Detailed", onChanged: (val) => settings.setGranularity(val)),
+          const Text("Detail Level"),
+          Slider(
+            value: settings.taskGranularity, 
+            min: 0.0, max: 2.0, divisions: 2, 
+            label: settings.taskGranularity == 0.0 ? "Simple" : "Detailed", 
+            onChanged: (val) => settings.setGranularity(val)
+          ),
 
           const SizedBox(height: 40),
           ElevatedButton(
@@ -83,7 +99,7 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 16)),
-            child: const Text("Save Profile"),
+            child: const Text("Save & Encrypt"),
           ),
         ],
       ),

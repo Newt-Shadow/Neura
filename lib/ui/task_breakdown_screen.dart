@@ -15,6 +15,7 @@ import 'package:image/image.dart' as img;
 import '../logic/neuro_settings.dart';
 import '../logic/model_holder.dart';
 import 'interactive_task_screen.dart';
+import 'ar_task_screen.dart';
 
 class TaskBreakdownScreen extends StatefulWidget {
   const TaskBreakdownScreen({super.key});
@@ -292,47 +293,57 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
 
   // --- MODE 2: TASK AGENT LOGIC ---
   // --- MODE 2: TASK AGENT LOGIC (UPDATED) ---
-  Future<void> _processRequest({String? textInput, Uint8List? imageBytes, bool forcePlan = false}) async {
-    setState(() { 
-      _isLoading = true; 
-      _statusMessage = forcePlan ? "Drafting Plan..." : "Analyzing Scene..."; 
+  Future<void> _processRequest({
+    String? textInput,
+    Uint8List? imageBytes,
+    bool forcePlan = false,
+  }) async {
+    setState(() {
+      _isLoading = true;
+      _statusMessage = forcePlan ? "Drafting Plan..." : "Analyzing Scene...";
     });
 
     try {
+      final settings = context.read<NeuroSettings>();
+      // Save User Query to History
+      if (textInput != null) settings.addToHistory('user', textInput);
       final response = await RemoteAIService.processRequest(
-        userQuery: textInput ?? (forcePlan ? "Create the plan." : ""), 
-        imageBytes: imageBytes, 
-        userSettings: context.read<NeuroSettings>(),
+        userQuery: textInput ?? (forcePlan ? "Create the plan." : ""),
+        imageBytes: imageBytes,
+        userSettings: settings,
       );
 
       if (response == null) throw Exception("Brain fog. Try again.");
+      settings.addToHistory('ai', response.message);
 
       if (response.type == AIResponseType.question) {
         // CASE A: DYNAMIC OPTIONS RETURNED BY AI
         setState(() {
           _clarificationQuestion = response.message;
           // Use the options from the AI, or fallback if empty
-          _clarificationOptions = (response.options != null && response.options!.isNotEmpty)
-              ? response.options 
-              : ["Clean", "Organize", "Declutter"]; 
+          _clarificationOptions =
+              (response.options != null && response.options!.isNotEmpty)
+              ? response.options
+              : ["Clean", "Organize", "Declutter"];
         });
       } else {
         // CASE B: PLAN READY
         if (!mounted) return;
         Navigator.push(
-          context, 
-          MaterialPageRoute(builder: (_) => InteractiveTaskScreen(
-            initialTasks: response.actions ?? [], 
-            motivation: response.message,
-            onReset: () { 
-              Navigator.pop(context);
-              // Clear pending image when we return to start fresh
-              _pendingImageBytes = null; 
-            }
-          ))
+          context,
+          MaterialPageRoute(
+            builder: (_) => ArTaskScreen(
+              tasks: response.actions ?? [],
+              initialArBox: response.box2d,
+              settings: settings,
+              onClose: () {
+                Navigator.pop(context);
+                _pendingImageBytes = null; // Clear memory
+              },
+            ),
+          ),
         );
       }
-
     } catch (e) {
       setState(() => _statusMessage = "Error: $e");
     } finally {
@@ -461,45 +472,34 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
   }
 
   Widget _buildTaskView() {
-    if (_isLoading) return _buildLoadingView();
+    if (_isLoading) return Center(child: Text(_statusMessage));
     if (_clarificationOptions != null) return _buildOptionsView();
-    return _buildEmptyState("Ready to break down tasks.");
+    return const Center(child: Text("Ready to analyze tasks."));
   }
 
   Widget _buildChatView() {
-    if (_chatMessages.isEmpty && !_isLoading) {
-      return _buildEmptyState("Let's chat! Say Hi.");
-    }
+    final settings = context.watch<NeuroSettings>();
+    final allMessages = [
+      ...settings.history.map((h) => {'role': h['role']!, 'text': h['text']!}),
+      ..._chatMessages,
+    ];
+    // if (_chatMessages.isEmpty && !_isLoading) {
+    //   return _buildEmptyState("Let's chat! Say Hi.");
+    // }
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(16),
       itemCount: _chatMessages.length + (_isLoading ? 1 : 0),
       itemBuilder: (ctx, i) {
-        if (i == _chatMessages.length) {
-          return const Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: EdgeInsets.all(8),
-              child: CircularProgressIndicator(),
-            ),
-          );
-        }
-        final msg = _chatMessages[i];
-        final isUser = msg['role'] == 'user';
-        return Align(
-          alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 4),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isUser ? Colors.teal : Colors.grey.shade200,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Text(
-              msg['text']!,
-              style: TextStyle(color: isUser ? Colors.white : Colors.black87),
-            ),
+        final msg = allMessages[i];
+        return ListTile(
+          title: Text(
+            msg['text']!,
+            textAlign: msg['role'] == 'user' ? TextAlign.right : TextAlign.left,
           ),
+          subtitle: i < settings.history.length
+              ? const Text("History", style: TextStyle(fontSize: 10))
+              : null,
         );
       },
     );

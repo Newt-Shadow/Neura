@@ -35,6 +35,13 @@ dependencies:
   google_sign_in: ^6.1.6
   flutter_secure_storage: ^9.0.0 # For saving the API Key safely
   cloud_firestore: ^4.14.0       # To save patient details
+  encrypt: ^5.0.3
+  
+
+  
+
+  # Vision & AR
+  camera: ^0.10.5+9
 
 
 dev_dependencies:

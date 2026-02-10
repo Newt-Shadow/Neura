@@ -1,117 +1,170 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:encrypt/encrypt.dart' as enc;
 
 class NeuroSettings extends ChangeNotifier {
+  final _storage = const FlutterSecureStorage();
   
-  // Visual
-  bool _useDyslexicFont = false;
-  bool _highContrast = false;
-  
-  // Cognitive
-  double _taskGranularity = 0.5; // 0.0=Micro, 0.5=Standard, 1.0=Detailed
-  
-  // Personal Profile
-  String _userName = "";
-  String _diagnosis = ""; // e.g., ADHD, Autism, Dyslexia
-  String _sensorySensitivities = ""; // e.g., Loud noises, Bright lights
-  String _preferredLanguage = "English"; // English, Hindi, Hinglish, etc.
-  
-  // Gamification
+  // --- HARDCODE KEY HERE (As requested) ---
+  static const String _hardcodedKey = "YOUR_GEMINI_API_KEY_HERE"; 
+
+  // Encryption
+  final _encKey = enc.Key.fromUtf8('MySecretKeyForNeuroApp1234567890');
+  final _iv = enc.IV.fromLength(16);
+
+  // State
+  String _userApiKey = "";
+  Map<String, String> _profile = {};
+  List<Map<String, String>> _history = [];
   int _streakCount = 0;
 
-  // Getters
-  bool get useDyslexicFont => _useDyslexicFont;
-  bool get highContrast => _highContrast;
-  double get taskGranularity => _taskGranularity;
-  String get userName => _userName;
-  String get diagnosis => _diagnosis;
-  String get sensorySensitivities => _sensorySensitivities;
-  String get preferredLanguage => _preferredLanguage;
+  // --- GETTERS ---
+  String get userApiKey => _userApiKey;
   int get streakCount => _streakCount;
+  List<Map<String, String>> get history => _history;
+  User? get currentUser => FirebaseAuth.instance.currentUser;
 
-  String? get fontFamily => _useDyslexicFont ? 'OpenDyslexic' : null;
+  String get userName => _profile['name'] ?? "Friend";
+  String get diagnosis => _profile['diagnosis'] ?? "";
+  String get sensorySensitivities => _profile['sensory'] ?? "";
+  String get preferredLanguage => _profile['language'] ?? "English";
+  
+  bool get useDyslexicFont => _profile['font'] == 'dyslexic';
+  bool get highContrast => _profile['contrast'] == 'high';
+  double get taskGranularity => double.tryParse(_profile['granularity'] ?? "1.0") ?? 1.0;
 
+  // *** THIS FIXES YOUR MAIN.DART ERROR ***
+  String? get fontFamily => useDyslexicFont ? 'OpenDyslexic' : null;
+
+  // --- INIT ---
   Future<void> loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    _useDyslexicFont = prefs.getBool('neuro_dyslexic_font') ?? false;
-    _highContrast = prefs.getBool('neuro_high_contrast') ?? false;
-    _taskGranularity = prefs.getDouble('neuro_granularity') ?? 0.5;
     
-    _userName = prefs.getString('user_name') ?? '';
-    _diagnosis = prefs.getString('user_diagnosis') ?? '';
-    _sensorySensitivities = prefs.getString('user_sensory') ?? '';
-    _preferredLanguage = prefs.getString('user_language_pref') ?? 'English';
+    // 1. Load Key (Prioritize saved, fallback to hardcoded)
+    String? savedKey = await _storage.read(key: "gemini_api_key");
+    if (savedKey != null && savedKey.isNotEmpty) {
+      _userApiKey = savedKey;
+    } else {
+      _userApiKey = _hardcodedKey;
+    }
     
-    _streakCount = prefs.getInt('user_streak') ?? 0;
+    // 2. Load Local Data
+    _streakCount = prefs.getInt('streak') ?? 0;
+    String? localProfile = prefs.getString('local_profile');
+    if (localProfile != null) _profile = Map<String, String>.from(json.decode(localProfile));
+    
+    String? localHistory = prefs.getString('local_history');
+    if (localHistory != null) {
+      List<dynamic> raw = json.decode(localHistory);
+      _history = raw.map((e) => Map<String, String>.from(e)).toList();
+    }
+
+    if (currentUser != null) await _syncFromCloud();
     notifyListeners();
   }
 
-  Future<void> toggleFont() async {
-    _useDyslexicFont = !_useDyslexicFont;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('neuro_dyslexic_font', _useDyslexicFont);
-    notifyListeners();
+  // --- UI ACTIONS ---
+  void saveProfile({required String name, required String diagnosis, required String sensory, required String language}) {
+    updateProfile({'name': name, 'diagnosis': diagnosis, 'sensory': sensory, 'language': language});
   }
 
-  Future<void> toggleContrast() async {
-    _highContrast = !_highContrast;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('neuro_high_contrast', _highContrast);
-    notifyListeners();
+  void toggleFont() {
+    updateProfile({'font': (_profile['font'] == 'dyslexic') ? 'standard' : 'dyslexic'});
   }
 
-  Future<void> setGranularity(double val) async {
-    _taskGranularity = val;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('neuro_granularity', _taskGranularity);
-    notifyListeners();
+  void toggleContrast() {
+    updateProfile({'contrast': (_profile['contrast'] == 'high') ? 'standard' : 'high'});
   }
 
-  Future<void> saveProfile({
-    required String name,
-    required String diagnosis,
-    required String sensory,
-    required String language,
-  }) async {
-    _userName = name;
-    _diagnosis = diagnosis;
-    _sensorySensitivities = sensory;
-    _preferredLanguage = language;
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_name', name);
-    await prefs.setString('user_diagnosis', diagnosis);
-    await prefs.setString('user_sensory', sensory);
-    await prefs.setString('user_language_pref', language);
-    notifyListeners();
+  void setGranularity(double val) {
+    updateProfile({'granularity': val.toString()});
   }
 
-  Future<void> incrementStreak() async {
+  void incrementStreak() {
     _streakCount++;
+    _saveToLocal();
+    _saveToCloud();
+    notifyListeners();
+  }
+
+  // --- CORE DATA LOGIC ---
+  void updateProfile(Map<String, String> updates) {
+    _profile.addAll(updates);
+    _saveToLocal();
+    _saveToCloud();
+    notifyListeners();
+  }
+
+  void addToHistory(String role, String text) {
+    if (_history.length > 50) _history.removeAt(0);
+    _history.add({'role': role, 'text': text, 'timestamp': DateTime.now().toIso8601String()});
+    _saveToLocal();
+    _saveToCloud();
+    notifyListeners();
+  }
+
+  Future<void> setApiKey(String key) async {
+    _userApiKey = key;
+    await _storage.write(key: "gemini_api_key", value: key);
+    notifyListeners();
+  }
+
+  Future<void> signInWithGoogle() async {
+    // Implement Firebase Auth Logic Here
+    if (currentUser != null) await _syncFromCloud();
+  }
+
+  Future<void> _syncFromCloud() async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(currentUser!.uid).get();
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        if (data.containsKey('encrypted_profile')) _profile = _decryptMap(data['encrypted_profile']);
+        if (data.containsKey('streak')) _streakCount = data['streak'];
+        _saveToLocal();
+        notifyListeners();
+      }
+    } catch (e) { print("Sync Error: $e"); }
+  }
+
+  Future<void> _saveToCloud() async {
+    if (currentUser == null) return;
+    try {
+      final encrypter = enc.Encrypter(enc.AES(_encKey));
+      String encryptedProfile = encrypter.encrypt(json.encode(_profile), iv: _iv).base64;
+      await FirebaseFirestore.instance.collection('users').doc(currentUser!.uid).set({
+        'encrypted_profile': encryptedProfile,
+        'streak': _streakCount,
+        'last_updated': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) { print("Cloud Save Error: $e"); }
+  }
+
+  Future<void> _saveToLocal() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('user_streak', _streakCount);
-    notifyListeners();
+    await prefs.setString('local_profile', json.encode(_profile));
+    await prefs.setString('local_history', json.encode(_history));
+    await prefs.setInt('streak', _streakCount);
   }
 
-  Map<String, String> _learnedTraits = {};
-
-  // Called by RemoteAIService when AI learns something new
-  Future<void> updateProfile(Map<String, String> newTraits) async {
-    _learnedTraits.addAll(newTraits);
-    notifyListeners();
-    // TODO: Save _learnedTraits to SharedPreferences
+  Map<String, String> _decryptMap(String base64String) {
+    try {
+      final encrypter = enc.Encrypter(enc.AES(_encKey));
+      final decrypted = encrypter.decrypt64(base64String, iv: _iv);
+      return Map<String, String>.from(json.decode(decrypted));
+    } catch (e) { return {}; }
   }
 
-  // Used to inject into the Prompt
   String generateProfileString() {
-    if (_learnedTraits.isEmpty) return "No specific details known.";
-    
-    return _learnedTraits.entries
-        .map((e) => "- ${e.key}: ${e.value}")
-        .join("\n");
+    StringBuffer sb = StringBuffer();
+    if (_profile.isNotEmpty) {
+      sb.writeln("USER PROFILE:");
+      _profile.forEach((k, v) => sb.writeln("- $k: $v"));
+    }
+    return sb.toString();
   }
 }

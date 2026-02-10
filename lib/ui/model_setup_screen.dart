@@ -9,6 +9,8 @@ import '../logic/model_holder.dart';
 
 class ModelSetupScreen extends StatefulWidget {
   const ModelSetupScreen({super.key});
+
+  
   @override
   State<ModelSetupScreen> createState() => _ModelSetupScreenState();
 }
