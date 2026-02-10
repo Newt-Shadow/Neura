@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'dart:async';
-import 'package:image/image.dart' as img; // For pixel diff (lightweight body double)
+import 'package:image/image.dart' as img; 
 import '../logic/neuro_settings.dart';
 import '../logic/remote_ai_service.dart';
 
@@ -24,16 +24,13 @@ class ArTaskScreen extends StatefulWidget {
   State<ArTaskScreen> createState() => _ArTaskScreenState();
 }
 
-class _ArTaskScreenState extends State<ArTaskScreen> {
+class _ArTaskScreenState extends State<ArTaskScreen> with WidgetsBindingObserver {
   CameraController? _controller;
   final FlutterTts _tts = FlutterTts();
   
-  // Body Double State
   Timer? _stuckTimer;
   bool _hasMovedRecently = false;
-  DateTime _lastFrameTime = DateTime.now();
   
-  // AR State
   int _currentStep = 0;
   List<int>? _currentArBox;
   bool _isScanning = false;
@@ -41,46 +38,70 @@ class _ArTaskScreenState extends State<ArTaskScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this); // Detect app backgrounding
     _currentArBox = widget.initialArBox;
     _initCamera();
-    _startBodyDoubleMonitor();
-    Future.delayed(const Duration(seconds: 1), _speakCurrentTask);
+    
+    if (widget.tasks.isNotEmpty) {
+      _startBodyDoubleMonitor();
+      Future.delayed(const Duration(seconds: 1), _speakCurrentTask);
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _stuckTimer?.cancel();
+    _controller?.dispose(); // Clean up camera
+    super.dispose();
+  }
+
+  // Fix Camera Freeze on App Switch
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final CameraController? cameraController = _controller;
+
+    if (cameraController == null || !cameraController.value.isInitialized) {
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive) {
+      cameraController.dispose();
+    } else if (state == AppLifecycleState.resumed) {
+      _initCamera();
+    }
   }
 
   Future<void> _initCamera() async {
-    final cameras = await availableCameras();
-    if (cameras.isEmpty) return;
-    
-    _controller = CameraController(
-      cameras.first, 
-      ResolutionPreset.medium, 
-      enableAudio: false,
-      imageFormatGroup: ImageFormatGroup.yuv420,
-    );
-    
-    await _controller!.initialize();
-    
-    if (mounted) {
-      setState(() {});
-      // Simple "Body Double": If camera is streaming, assume minimal activity.
-      // A full pixel diff on every frame is heavy for Dart in main thread.
-      // We implement a simplified check: User Interaction resets the timer.
-      // Real "Pixel Diff" requires Isolates, but here is a simulated "Activity Check".
+    try {
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) return;
+      
+      final controller = CameraController(
+        cameras.first, 
+        ResolutionPreset.medium, 
+        enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.yuv420,
+      );
+      
+      await controller.initialize();
+      if (mounted) {
+        setState(() => _controller = controller);
+      }
+    } catch (e) {
+      print("Camera Init Error: $e");
     }
   }
 
   void _startBodyDoubleMonitor() {
-    // If no interaction or detection for 60 seconds, nudge.
     _stuckTimer = Timer.periodic(const Duration(seconds: 60), (timer) {
-      if (!_hasMovedRecently) {
+      if (!_hasMovedRecently && mounted) {
         _tts.speak("I noticed we stopped. Is there a blocker? Let's just do one tiny thing.");
-        if (mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: const Text("👀 Body Double: Are we stuck?"),
-            backgroundColor: Colors.orange,
-            action: SnackBarAction(label: "I'm working!", onPressed: _resetStuckTimer),
-          ));
-        }
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text("👀 Body Double: Are we stuck?"),
+          backgroundColor: Colors.orange,
+          action: SnackBarAction(label: "I'm working!", onPressed: _resetStuckTimer),
+        ));
       }
       _hasMovedRecently = false;
     });
@@ -91,41 +112,50 @@ class _ArTaskScreenState extends State<ArTaskScreen> {
   }
 
   Future<void> _speakCurrentTask() async {
-    if (_currentStep < widget.tasks.length) {
+    if (widget.tasks.isNotEmpty && _currentStep < widget.tasks.length) {
       await _tts.speak(widget.tasks[_currentStep]['title']);
     }
   }
 
-  // --- AR SCANNER ---
   Future<void> _scanForCurrentObject() async {
     if (_controller == null || !_controller!.value.isInitialized) return;
+    if (widget.tasks.isEmpty) return;
     
     _resetStuckTimer();
     setState(() => _isScanning = true);
     _tts.speak("Scanning for ${widget.tasks[_currentStep]['title']}...");
 
     try {
+      // 1. Take Picture
       final file = await _controller!.takePicture();
       final bytes = await file.readAsBytes();
+      
+      // 2. Check if user left the screen while we were taking the picture
+      if (!mounted) return;
+
       final taskName = widget.tasks[_currentStep]['title'];
       
+      // 3. Ask AI
       final response = await RemoteAIService.processRequest(
         userQuery: "Where is the '$taskName'? Return box_2d only. If not visible return null.",
         imageBytes: bytes,
         userSettings: widget.settings,
       );
 
-      if (response != null && response.box2d != null) {
-        setState(() => _currentArBox = List<int>.from(response.box2d!));
-        _tts.speak("Found it! Look for the green box.");
-      } else {
-        _tts.speak("I can't see it clearly here. Try moving the camera.");
-        setState(() => _currentArBox = null);
+      // 4. Update UI (Only if still on screen)
+      if (mounted) {
+        if (response != null && response.box2d != null) {
+          setState(() => _currentArBox = List<int>.from(response.box2d!));
+          _tts.speak("Found it! Look for the green box.");
+        } else {
+          _tts.speak("I can't see it clearly here. Try moving the camera.");
+          setState(() => _currentArBox = null);
+        }
       }
     } catch (e) {
-      _tts.speak("Error scanning.");
+      if (mounted) _tts.speak("Error scanning.");
     } finally {
-      setState(() => _isScanning = false);
+      if (mounted) setState(() => _isScanning = false);
     }
   }
 
@@ -134,7 +164,7 @@ class _ArTaskScreenState extends State<ArTaskScreen> {
     setState(() {
       if (_currentStep < widget.tasks.length - 1) {
         _currentStep++;
-        _currentArBox = null; // Clear old box to avoid confusion
+        _currentArBox = null;
         _speakCurrentTask();
       } else {
         _tts.speak("Mission Accomplished! You are amazing.");
@@ -145,14 +175,29 @@ class _ArTaskScreenState extends State<ArTaskScreen> {
   }
 
   @override
-  void dispose() {
-    _controller?.dispose();
-    _stuckTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    if (widget.tasks.isEmpty) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 60, color: Colors.red),
+              const SizedBox(height: 16),
+              const Text("No tasks generated.", style: TextStyle(fontSize: 18)),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: widget.onClose,
+                child: const Text("Go Back"),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Show loading spinner if camera isn't ready
     if (_controller == null || !_controller!.value.isInitialized) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -162,17 +207,18 @@ class _ArTaskScreenState extends State<ArTaskScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // 1. Camera Feed (The Body Double)
+          // 1. Camera Preview
           Positioned.fill(child: CameraPreview(_controller!)),
           
-          // 2. AR Overlay (The Entry Ramp)
+          // 2. AR Overlay
           if (_currentArBox != null)
             Positioned.fill(child: CustomPaint(painter: ARBoxPainter(_currentArBox!))),
 
+          // 3. Scanning Indicator
           if (_isScanning)
              const Center(child: CircularProgressIndicator(color: Colors.greenAccent)),
 
-          // 3. Task UI (The Nudge)
+          // 4. Task UI Card
           Positioned(
             bottom: 0, left: 0, right: 0,
             child: Container(
@@ -202,7 +248,7 @@ class _ArTaskScreenState extends State<ArTaskScreen> {
                        ],
                      ),
                      const SizedBox(height: 8),
-                     Text(task['title'], style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                     Text(task['title'] ?? "Task", style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                      const SizedBox(height: 4),
                      if(task['description'] != null)
                        Text(task['description'], style: const TextStyle(fontSize: 16, color: Colors.black87)),
@@ -223,7 +269,7 @@ class _ArTaskScreenState extends State<ArTaskScreen> {
             ),
           ),
           
-          // Back Button
+          // 5. Back Button
           Positioned(
             top: 50, left: 20,
             child: CircleAvatar(
@@ -237,7 +283,6 @@ class _ArTaskScreenState extends State<ArTaskScreen> {
   }
 }
 
-// AR Painter
 class ARBoxPainter extends CustomPainter {
   final List<int> box;
   ARBoxPainter(this.box);
@@ -246,7 +291,9 @@ class ARBoxPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..color = Colors.greenAccent..style = PaintingStyle.stroke..strokeWidth = 6.0;
     
-    // Map 0-1000 AI coordinates to Screen
+    if (box.length < 4) return;
+
+    // Normalize coordinates (0-1000) to screen size
     double top = (box[0] / 1000) * size.height;
     double left = (box[1] / 1000) * size.width;
     double bottom = (box[2] / 1000) * size.height;

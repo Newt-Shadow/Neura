@@ -10,7 +10,7 @@ class NeuroSettings extends ChangeNotifier {
   final _storage = const FlutterSecureStorage();
   
   // --- HARDCODE KEY HERE (As requested) ---
-  static const String _hardcodedKey = "YOUR_GEMINI_API_KEY_HERE"; 
+  static const String _hardcodedKey = "AIzaSyCwkfy6HnkL95kViLCv4HHXZSngDNKLRzk"; 
 
   // Encryption
   final _encKey = enc.Key.fromUtf8('MySecretKeyForNeuroApp1234567890');

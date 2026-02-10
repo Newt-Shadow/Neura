@@ -1,18 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'localization/app_strings.dart';
+import 'package:firebase_core/firebase_core.dart'; // <--- REQUIRED
+import 'firebase_options.dart'; // <--- REQUIRED
 
+import 'localization/app_strings.dart';
 import 'logic/neuro_settings.dart';
 import 'ui/smart_dashboard_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // 1. INITIALIZE FIREBASE (Fixes Blank Screen)
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    print("Firebase Error: $e"); // Continue even if Firebase fails (Guest Mode)
+  }
+
+  // 2. Load Strings
   final appStrings = AppStrings();
   try { await appStrings.loadFromAsset('assets/strings_en.json'); } catch (_) {}
 
+  // 3. Load Settings (Now safe to use Firebase)
   final neuroSettings = NeuroSettings();
-  await neuroSettings.loadSettings();
+  await neuroSettings.loadSettings(); 
   
   runApp(
     MultiProvider(
@@ -33,10 +46,10 @@ class MyApp extends StatelessWidget {
     final settings = context.watch<NeuroSettings>();
     
     return MaterialApp(
-      title: 'Smart Companion',
+      title: 'Neura',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        fontFamily: settings.fontFamily,
+        fontFamily: settings.fontFamily, // Uses your Dyslexic Font setting
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.teal,

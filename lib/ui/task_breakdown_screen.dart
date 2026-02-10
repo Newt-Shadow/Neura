@@ -329,6 +329,11 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
       } else {
         // CASE B: PLAN READY
         if (!mounted) return;
+        final tasks = response.actions ?? [];
+        if (tasks.isEmpty) {
+           setState(() => _statusMessage = "AI returned no tasks. Please try again.");
+           return;
+        }
         Navigator.push(
           context,
           MaterialPageRoute(
