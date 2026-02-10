@@ -36,9 +36,7 @@ dependencies:
   flutter_secure_storage: ^9.0.0 # For saving the API Key safely
   cloud_firestore: ^4.14.0       # To save patient details
   encrypt: ^5.0.3
-  
-
-  
+  flutter_dotenv: ^5.1.0  
 
   # Vision & AR
   camera: ^0.10.5+9
@@ -59,6 +57,7 @@ flutter:
         - asset: assets/OpenDyslexic-Regular.otf
 
   assets:
+    - .env
     - assets/strings_it.json
     - assets/strings_en.json
     - assets/strings_fr.json

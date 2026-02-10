@@ -113,10 +113,37 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
               ),
             )
           else
-            IconButton(
-              icon: const Icon(Icons.face_6_outlined, size: 30),
-              tooltip: "My Profile",
-              onPressed: () => setState(() => _selectedIndex = 2), // Go to Profile
+            PopupMenuButton<String>(
+              icon: CircleAvatar(
+                backgroundColor: Colors.teal,
+                backgroundImage: settings.currentUser?.photoURL != null 
+                    ? NetworkImage(settings.currentUser!.photoURL!) 
+                    : null,
+                child: settings.currentUser?.photoURL == null 
+                    ? const Icon(Icons.person, color: Colors.white) 
+                    : null,
+              ),
+              onSelected: (val) {
+                if (val == 'profile') {
+                  setState(() => _selectedIndex = 2); // Go to Profile Tab
+                } else if (val == 'logout') {
+                  settings.signOut();
+                }
+              },
+              itemBuilder: (ctx) => [
+                PopupMenuItem(
+                  value: 'profile',
+                  child: Text("Logged in as ${settings.currentUser?.displayName ?? 'User'}"),
+                ),
+                const PopupMenuItem(
+                  value: 'profile',
+                  child: Row(children: [Icon(Icons.person), SizedBox(width: 8), Text("My Profile")]),
+                ),
+                const PopupMenuItem(
+                  value: 'logout',
+                  child: Row(children: [Icon(Icons.logout, color: Colors.red), SizedBox(width: 8), Text("Sign Out", style: TextStyle(color: Colors.red))]),
+                ),
+              ],
             ),
         ],
       ),

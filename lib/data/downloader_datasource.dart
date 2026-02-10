@@ -6,11 +6,10 @@ import 'package:neuro/domain/download_model.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// Import del token locale (file non committato)
+
 import 'token.dart';
 
-/// Utilizza il token dal file locale per sviluppo
-/// In produzione: sostituisci con il tuo token Hugging Face
+
 final accessToken = huggingFaceToken;
 
 class GemmaDownloaderDataSource {

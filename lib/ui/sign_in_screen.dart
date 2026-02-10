@@ -1,49 +1,49 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../logic/neuro_settings.dart';
+import 'profile_setup_screen.dart'; // We will create this next
 
-class SignInScreen extends StatefulWidget {
+class SignInScreen extends StatelessWidget {
   const SignInScreen({super.key});
 
-  @override
-  State<SignInScreen> createState() => _SignInScreenState();
-}
-
-class _SignInScreenState extends State<SignInScreen> {
-  bool _isLoading = false;
-
-  Future<void> _handleSignIn() async {
-    setState(() => _isLoading = true);
+  Future<void> _handleGoogleSignIn(BuildContext context) async {
+    final settings = context.read<NeuroSettings>();
     
-    // 1. Simulate network/auth delay
-    await Future.delayed(const Duration(seconds: 1));
+    // Call the Google Sign In logic
+    final user = await settings.signInWithGoogle();
     
-    if (mounted) {
-      // 2. Trigger the logic in settings
-      // (Uses the Hardcoded Key or Firebase if configured)
-      await context.read<NeuroSettings>().signInWithGoogle();
-      
-      setState(() => _isLoading = false);
-      
-      // 3. Show Success & Close Screen
+    if (user != null && context.mounted) {
+      // Check if profile is empty (New User?)
+      if (settings.userName == "Friend" || settings.userName.isEmpty) {
+        // Go to Profile Setup
+        Navigator.pushReplacement(
+          context, 
+          MaterialPageRoute(builder: (_) => const ProfileSetupScreen())
+        );
+      } else {
+        // Existing user, go back or show success
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Welcome back!")),
+        );
+      }
+    } else if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Signed In! History will now sync."),
-          backgroundColor: Colors.green,
-        ),
+        const SnackBar(content: Text("Sign In Failed or Cancelled")),
       );
-      Navigator.pop(context); // Go back to Dashboard
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.watch<NeuroSettings>();
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () => Navigator.pop(context), // "Continue as Guest" logic
+          onPressed: () => Navigator.pop(context),
         ),
       ),
       body: Padding(
@@ -51,30 +51,30 @@ class _SignInScreenState extends State<SignInScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.cloud_sync, size: 80, color: Colors.teal),
+            const Icon(Icons.psychology, size: 80, color: Colors.teal),
             const SizedBox(height: 32),
             const Text(
-              "Sync Your Brain",
+              "Sync Your Mind",
               style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             const Text(
-              "Sign in to backup your history, preferences, and streaks to the cloud.",
+              "Securely backup your history, streaks, and preferences with Google.",
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
             const Spacer(),
             
-            if (_isLoading)
+            if (settings.isLoading)
               const CircularProgressIndicator()
             else
               SizedBox(
                 width: double.infinity,
                 height: 55,
                 child: ElevatedButton.icon(
-                  onPressed: _handleSignIn,
+                  onPressed: () => _handleGoogleSignIn(context),
                   icon: const Icon(Icons.login),
-                  label: const Text("Sign In with Google"),
+                  label: const Text("Continue with Google"),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.black,
                     foregroundColor: Colors.white,
@@ -84,10 +84,11 @@ class _SignInScreenState extends State<SignInScreen> {
               ),
               
             const SizedBox(height: 16),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Not now, continue as Guest", style: TextStyle(color: Colors.grey)),
-            ),
+            if (!settings.isLoading)
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Continue as Guest", style: TextStyle(color: Colors.grey)),
+              ),
             const SizedBox(height: 30),
           ],
         ),
