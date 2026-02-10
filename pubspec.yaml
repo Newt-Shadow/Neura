@@ -1,5 +1,5 @@
-name: neuro_nox
-description: "Applicazione AI offline per Neuro_Nox, sviluppata da Guido Marangoni."
+name: neuro
+description: "Applicazione AI offline per neuro, sviluppata da Guido Marangoni."
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 

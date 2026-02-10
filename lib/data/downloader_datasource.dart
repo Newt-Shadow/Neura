@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:neuro_nox/domain/download_model.dart';
+import 'package:neuro/domain/download_model.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -69,7 +69,7 @@ class GemmaDownloaderDataSource {
   /// Downloads the model file and tracks progress.
   Future<void> downloadModel({
     required String token,
-    required Function(double) onProgress,
+    required Function(int received, int total) onProgress, 
   }) async {
     http.StreamedResponse? response;
     IOSink? fileSink;
@@ -85,8 +85,9 @@ class GemmaDownloaderDataSource {
       }
 
       final request = http.Request('GET', Uri.parse(model.modelUrl));
-      if (token.isNotEmpty) {
-        request.headers['Authorization'] = 'Bearer $token';
+      final effectiveToken = token.isNotEmpty ? token : accessToken; 
+      if (effectiveToken.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $effectiveToken';
       }
 
       if (downloadedBytes > 0) {
@@ -104,7 +105,7 @@ class GemmaDownloaderDataSource {
         await for (final chunk in response.stream) {
           fileSink.add(chunk);
           received += chunk.length;
-          onProgress(totalBytes > 0 ? received / totalBytes : 0.0);
+          onProgress(received, totalBytes);
         }
         await prefs.setBool(_preferenceKey, true);
         if (kDebugMode) {

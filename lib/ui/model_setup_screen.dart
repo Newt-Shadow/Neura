@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:flutter_gemma/flutter_gemma.dart';
 import 'dart:io';
-
+import 'dart:math';
 import '../data/downloader_datasource.dart';
 import '../domain/download_model.dart';
 import '../logic/model_holder.dart';
@@ -19,6 +19,12 @@ class _ModelSetupScreenState extends State<ModelSetupScreen> {
     {'name': 'Gemma 4B (Smart)', 'filename': 'gemma-3n-E4B-it-int4.task', 'url': 'https://huggingface.co/google/gemma-3n-E4B-it-litert-preview/resolve/main/gemma-3n-E4B-it-int4.task', 'isDownloaded': false},
   ];
   String _status = ""; double? _progress; bool _isBusy = false;
+  String _formatBytes(int bytes, int decimals) {
+    if (bytes <= 0) return "0 B";
+    const suffixes = ["B", "KB", "MB", "GB", "TB"];
+    var i = (log(bytes) / log(1024)).floor();
+    return '${(bytes / pow(1024, i)).toStringAsFixed(decimals)} ${suffixes[i]}';
+  }
 
   @override
   void initState() { super.initState(); _checkModels(); }
@@ -31,13 +37,53 @@ class _ModelSetupScreenState extends State<ModelSetupScreen> {
   }
 
   Future<void> _download(int index) async {
-    setState(() { _isBusy = true; _status = "Downloading..."; });
+    setState(() { 
+      _isBusy = true; 
+      _status = "Starting..."; 
+      _progress = 0;
+    });
+    
     await WakelockPlus.enable();
     final m = _models[index];
-    await GemmaDownloaderDataSource(model: DownloadModel(modelUrl: m['url'], modelFilename: m['filename'])).downloadModel(token: "", onProgress: (p) => setState(() { _progress = p; _status = "${(p*100).toInt()}%"; }));
-    await _checkModels();
-    setState(() { _isBusy = false; _progress = null; });
-    await WakelockPlus.disable();
+    
+    try {
+      await GemmaDownloaderDataSource(
+        model: DownloadModel(modelUrl: m['url'], modelFilename: m['filename'])
+      ).downloadModel(
+        token: "", // It will now use the fallback token in datasource
+        onProgress: (received, total) {
+          setState(() {
+            // Calculate percentage for the progress bar
+            _progress = total > 0 ? received / total : 0;
+            
+            // Format the status string with size
+            final receivedStr = _formatBytes(received, 1);
+            final totalStr = _formatBytes(total, 1);
+            final percent = (_progress! * 100).toInt();
+            
+            _status = "$percent% ($receivedStr / $totalStr)";
+          });
+        }
+      );
+      
+      await _checkModels();
+      if (mounted) {
+        setState(() => _status = "Download Complete!");
+      }
+    } catch (e) {
+      // Catch errors (like 401 Unauthorized) and show them
+      if (mounted) {
+        setState(() => _status = "Error: $e");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Download failed: $e"), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() { _isBusy = false; });
+      }
+      await WakelockPlus.disable();
+    }
   }
 
   Future<void> _load(int index) async {

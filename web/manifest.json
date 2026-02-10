@@ -1,11 +1,11 @@
 {
-    "name": "Neuro_Nox Offline",
-    "short_name": "Neuro_Nox",
+    "name": "neuro Offline",
+    "short_name": "neuro",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#2196F3",
-    "description": "Applicazione AI offline per Neuro_Nox, sviluppata da Guido Marangoni.",
+    "description": "Applicazione AI offline per neuro, sviluppata da Guido Marangoni.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "Guido Marangoni" "\0"
-            VALUE "FileDescription", "neuro_nox" "\0"
+            VALUE "FileDescription", "neuro" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "neuro_nox" "\0"
+            VALUE "InternalName", "neuro" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2025 Guido Marangoni. All rights reserved." "\0"
-            VALUE "OriginalFilename", "neuro_nox.exe" "\0"
-            VALUE "ProductName", "neuro_nox" "\0"
+            VALUE "OriginalFilename", "neuro.exe" "\0"
+            VALUE "ProductName", "neuro" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

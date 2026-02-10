@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="it.arc.neuro_nox">
+    package="it.arc.neuro">
 
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.CAMERA"/>
@@ -9,7 +9,7 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
 
     <application
-        android:label="Neuro_Nox off"
+        android:label="neuro off"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
         <activity

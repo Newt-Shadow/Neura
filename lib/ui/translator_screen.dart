@@ -9,10 +9,10 @@ import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'package:neuro_nox/data/downloader_datasource.dart';
-import 'package:neuro_nox/domain/download_model.dart';
-import 'package:neuro_nox/localization/app_strings.dart';
-import 'package:neuro_nox/main.dart';
+import 'package:neuro/data/downloader_datasource.dart';
+import 'package:neuro/domain/download_model.dart';
+import 'package:neuro/localization/app_strings.dart';
+import 'package:neuro/main.dart';
 
 class TranslatorScreen extends StatefulWidget {
   const TranslatorScreen({super.key});
@@ -142,7 +142,7 @@ class _TranslatorScreenState extends State<TranslatorScreen> {
     return Scaffold(
       appBar: AppBar(
         // UI Enhancement: Added an emoji to the title and gave the AppBar a cleaner look.
-        title: const Text('Offline Neuro_Nox ❤️'),
+        title: const Text('Offline neuro ❤️'),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 1,
