@@ -211,10 +211,11 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
           _clarificationOptions = null;
         });
       } else {
+        final bytesToSend = _attachedImageBytes ?? _pendingImageBytes;
         if (_attachedImageBytes != null) {
           _pendingImageBytes = _attachedImageBytes;
         }
-        _processRequest(textInput: text, imageBytes: _attachedImageBytes);
+        _processRequest(textInput: text, imageBytes: bytesToSend);
       }
 
       // Clear the input preview, but _pendingImageBytes keeps the data alive logic-side
