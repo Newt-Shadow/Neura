@@ -5,6 +5,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:confetti/confetti.dart'; 
 import 'dart:async';
 import 'package:provider/provider.dart';
+import 'ar_task_screen.dart';
 
 import '../logic/neuro_settings.dart';
 
@@ -12,11 +13,13 @@ class InteractiveTaskScreen extends StatefulWidget {
   // CHANGED: Accept processed data directly
   final List<dynamic> initialTasks;
   final String motivation;
+  final List<int>? arBox;
   final VoidCallback onReset; // Kept this for your navigation logic
 
   const InteractiveTaskScreen({
     required this.initialTasks, 
     required this.motivation, 
+    this.arBox,
     required this.onReset, 
     super.key
   });
@@ -127,6 +130,17 @@ class _InteractiveTaskScreenState extends State<InteractiveTaskScreen> {
       }
     }
   }
+  void _switchToAR() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ArTaskScreen(
+        tasks: widget.initialTasks.sublist(_currentStep), // Pass remaining tasks
+        initialArBox: widget.arBox,
+        settings: context.read<NeuroSettings>(),
+        onClose: () => Navigator.pop(context),
+      ))
+    );
+  }
 
   void _showVictoryScreen() {
     _tts.speak("Mission Complete! ${widget.motivation}");
@@ -164,6 +178,7 @@ class _InteractiveTaskScreenState extends State<InteractiveTaskScreen> {
       ),
     );
   }
+  
 
   @override
   Widget build(BuildContext context) {
@@ -177,6 +192,14 @@ class _InteractiveTaskScreenState extends State<InteractiveTaskScreen> {
         title: Text("Mission"), // Simplified title
         centerTitle: true,
         leading: IconButton(icon: const Icon(Icons.close), onPressed: widget.onReset),
+        actions: [
+          // AR TOGGLE BUTTON (Only if camera/AR is relevant)
+          IconButton(
+            icon: const Icon(Icons.view_in_ar, color: Colors.teal),
+            tooltip: "Switch to AR Mode",
+            onPressed: _switchToAR,
+          )
+        ],
       ),
       body: Stack(
         children: [

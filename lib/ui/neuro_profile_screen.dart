@@ -89,14 +89,22 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
 
           const SizedBox(height: 40),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               settings.saveProfile(
                 name: _nameController.text,
                 diagnosis: _diagnosisController.text,
                 sensory: _sensoryController.text,
                 language: _selectedLanguage,
               );
-              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Profile Saved!")),
+                );
+                
+                // 3. Wait slightly to ensure UI update
+                await Future.delayed(const Duration(milliseconds: 200));
+
+                // 4. Safe Pop
+                if (mounted) Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 16)),
             child: const Text("Save & Encrypt"),

@@ -321,10 +321,9 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
         setState(() {
           _clarificationQuestion = response.message;
           // Use the options from the AI, or fallback if empty
-          _clarificationOptions =
-              (response.options != null && response.options!.isNotEmpty)
-              ? response.options
-              : ["Clean", "Organize", "Declutter"];
+          List<String> opts = response.options ?? ["Clean", "Organize", "Declutter"];
+          opts.add("Type my own..."); 
+          _clarificationOptions = opts;
         });
       } else {
         // CASE B: PLAN READY
@@ -337,11 +336,11 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => ArTaskScreen(
-              tasks: response.actions ?? [],
-              initialArBox: response.box2d,
-              settings: settings,
-              onClose: () {
+            builder: (_) => InteractiveTaskScreen(
+              initialTasks: response.actions ?? [],
+              motivation: response.message,
+              arBox: response.box2d, // Pass AR data just in case user wants it later
+              onReset: () {
                 Navigator.pop(context);
                 _pendingImageBytes = null; // Clear memory
               },

@@ -11,6 +11,22 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 class NeuroSettings extends ChangeNotifier {
   final _storage = const FlutterSecureStorage();
   final GoogleSignIn _googleSignIn = GoogleSignIn();
+  List<Map<String, String>> _chatHistory = [];
+  List<Map<String, String>> _taskHistory = [];
+
+  List<Map<String, String>> get chatHistory => _chatHistory;
+  List<Map<String, String>> get taskHistory => _taskHistory;
+  void addToChatHistory(String role, String text) {
+    _chatHistory.add({'role': role, 'text': text, 'timestamp': DateTime.now().toIso8601String()});
+    _saveToLocal(); // Update save logic to save both lists
+    notifyListeners();
+  }
+
+  void addToTaskHistory(String role, String text) {
+    _taskHistory.add({'role': role, 'text': text, 'timestamp': DateTime.now().toIso8601String()});
+    _saveToLocal();
+    notifyListeners();
+  }
 
   // --- HARDCODE KEY HERE (Fallback) ---
   // --- HARDCODE KEY HERE (Fallback) ---
