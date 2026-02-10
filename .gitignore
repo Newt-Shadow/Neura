@@ -11,6 +11,7 @@ yarn-error.log*
 pnpm-debug.log*
 dist/
 .vite/
+lib/firebase_options.dart
 
 
 # Cache & temp
