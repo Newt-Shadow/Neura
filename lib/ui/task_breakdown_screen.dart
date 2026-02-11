@@ -229,6 +229,8 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     }
   }
 
+  
+
   // --- MODE 1: CHAT LOGIC ---
   Future<void> _processNormalChat(String text) async {
     setState(() {
@@ -239,12 +241,12 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
 
     // Scroll to bottom
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients)
+      if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
           duration: 300.ms,
           curve: Curves.easeOut,
-        );
+        ); }
     });
 
     try {
@@ -454,24 +456,23 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
         if (_isTaskMode != isTask) {
           setState(() {
             _isTaskMode = isTask;
-            _resetSession();
+            // CRITICAL: Wipe session context when switching!
+            _activeChat = null;
+            _chatMessages.clear();
+            
+            if (!isTask) {
+               // Entering Chat Mode: KILL IMAGE CONTEXT
+               _pendingImageBytes = null; 
+               _attachedImageBytes = null;
+               _attachmentName = null;
+            }
           });
         }
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.teal : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.black54,
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-          ),
-        ),
+        decoration: BoxDecoration(color: isSelected ? Colors.teal : Colors.transparent, borderRadius: BorderRadius.circular(20)),
+        child: Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.black54, fontWeight: FontWeight.bold)),
       ),
     );
   }
@@ -491,20 +492,33 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     // if (_chatMessages.isEmpty && !_isLoading) {
     //   return _buildEmptyState("Let's chat! Say Hi.");
     // }
+    if (allMessages.isEmpty && !_isLoading) {
+      return const Center(child: Text("Say Hi! 👋"));
+    }
+    
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(16),
       itemCount: _chatMessages.length + (_isLoading ? 1 : 0),
       itemBuilder: (ctx, i) {
+        if (i >= allMessages.length) return const Center(child: CircularProgressIndicator());
         final msg = allMessages[i];
-        return ListTile(
-          title: Text(
-            msg['text']!,
-            textAlign: msg['role'] == 'user' ? TextAlign.right : TextAlign.left,
+        final text = msg['text'] ?? "Error: Message lost"; 
+        final role = msg['role'] ?? 'ai';
+        
+        final isUser = role == 'user';
+        return Align(
+          alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isUser ? Colors.teal.shade50 : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Text(text), // Safe string
           ),
-          subtitle: i < settings.history.length
-              ? const Text("History", style: TextStyle(fontSize: 10))
-              : null,
         );
       },
     );

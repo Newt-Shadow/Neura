@@ -23,7 +23,6 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
     _nameController.text = settings.userName;
     _diagnosisController.text = settings.diagnosis;
     _sensoryController.text = settings.sensorySensitivities;
-    
     if (_languages.contains(settings.preferredLanguage)) {
       _selectedLanguage = settings.preferredLanguage;
     }
@@ -38,7 +37,7 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          const Text("About Me (Encrypted & Synced)", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal)),
+          const Text("About Me (Encrypted)", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal)),
           const SizedBox(height: 16),
           
           TextField(controller: _nameController, decoration: const InputDecoration(labelText: "Name", border: OutlineInputBorder())),
@@ -52,42 +51,20 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
           ),
           const SizedBox(height: 16),
 
-          TextField(
-            controller: _diagnosisController,
-            decoration: const InputDecoration(labelText: "Diagnosis", hintText: "ADHD, Autism...", border: OutlineInputBorder()),
-          ),
+          TextField(controller: _diagnosisController, decoration: const InputDecoration(labelText: "Diagnosis", border: OutlineInputBorder())),
           const SizedBox(height: 16),
           
-          TextField(
-            controller: _sensoryController,
-            maxLines: 2,
-            decoration: const InputDecoration(labelText: "Sensory Triggers", hintText: "Loud noises, bright lights...", border: OutlineInputBorder()),
-          ),
+          TextField(controller: _sensoryController, maxLines: 2, decoration: const InputDecoration(labelText: "Sensory Triggers", border: OutlineInputBorder())),
           
           const SizedBox(height: 32),
-          const Text("Accessibility", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal)),
+          const Text("Preferences", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal)),
           
-          SwitchListTile(
-            title: const Text("Dyslexic-Friendly Font"), 
-            value: settings.useDyslexicFont, 
-            onChanged: (val) => settings.toggleFont()
-          ),
-          SwitchListTile(
-            title: const Text("High Contrast Mode"), 
-            value: settings.highContrast, 
-            onChanged: (val) => settings.toggleContrast()
-          ),
+          SwitchListTile(title: const Text("Dyslexic-Friendly Font"), value: settings.useDyslexicFont, onChanged: (val) => settings.toggleFont()),
+          SwitchListTile(title: const Text("High Contrast Mode"), value: settings.highContrast, onChanged: (val) => settings.toggleContrast()),
           
-          const SizedBox(height: 20),
-          const Text("Detail Level"),
-          Slider(
-            value: settings.taskGranularity, 
-            min: 0.0, max: 2.0, divisions: 2, 
-            label: settings.taskGranularity == 0.0 ? "Simple" : "Detailed", 
-            onChanged: (val) => settings.setGranularity(val)
-          ),
-
           const SizedBox(height: 40),
+          
+          // SAFE SAVE BUTTON
           ElevatedButton(
             onPressed: () async {
               settings.saveProfile(
@@ -96,19 +73,50 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
                 sensory: _sensoryController.text,
                 language: _selectedLanguage,
               );
-              ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Profile Saved!")),
-                );
-                
-                // 3. Wait slightly to ensure UI update
-                await Future.delayed(const Duration(milliseconds: 200));
-
-                // 4. Safe Pop
-                if (mounted) Navigator.pop(context);
+              FocusScope.of(context).unfocus();
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile Saved ✅"), backgroundColor: Colors.teal));
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 16)),
             child: const Text("Save & Encrypt"),
           ),
+
+          const SizedBox(height: 40),
+          const Divider(thickness: 2),
+          const SizedBox(height: 20),
+
+          // THE RESET BUTTON (Fixes Glitches)
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.red.shade200),
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.red.shade50
+            ),
+            child: ListTile(
+              leading: const Icon(Icons.delete_forever, color: Colors.red),
+              title: const Text("Reset App Data", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+              subtitle: const Text("Fixes glitches, leakage & history issues.", style: TextStyle(fontSize: 12)),
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text("Reset Everything?"),
+                    content: const Text("This will wipe all local history and settings to fix the bugs. Cloud data is safe."),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
+                      TextButton(
+                        onPressed: () {
+                          settings.clearAllData(); // CALLS THE NEW FUNCTION
+                          Navigator.pop(ctx);
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Reset Complete. Restarting...")));
+                        },
+                        child: const Text("Reset", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          )
         ],
       ),
     );

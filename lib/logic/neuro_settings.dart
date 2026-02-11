@@ -17,14 +17,18 @@ class NeuroSettings extends ChangeNotifier {
   List<Map<String, String>> get chatHistory => _chatHistory;
   List<Map<String, String>> get taskHistory => _taskHistory;
   void addToChatHistory(String role, String text) {
+    if (_chatHistory.length > 50) _chatHistory.removeAt(0);
     _chatHistory.add({'role': role, 'text': text, 'timestamp': DateTime.now().toIso8601String()});
-    _saveToLocal(); // Update save logic to save both lists
+    _saveToLocal();
+    _saveToCloud();
     notifyListeners();
   }
 
   void addToTaskHistory(String role, String text) {
+    if (_taskHistory.length > 20) _taskHistory.removeAt(0);
     _taskHistory.add({'role': role, 'text': text, 'timestamp': DateTime.now().toIso8601String()});
     _saveToLocal();
+    _saveToCloud();
     notifyListeners();
   }
 
@@ -83,8 +87,10 @@ class NeuroSettings extends ChangeNotifier {
     // 2. Load Local Data (Guest Mode)
     _streakCount = prefs.getInt('streak') ?? 0;
     String? localProfile = prefs.getString('local_profile');
-    if (localProfile != null)
-      _profile = Map<String, String>.from(json.decode(localProfile));
+    if (localProfile != null) _profile = Map<String, String>.from(json.decode(localProfile));
+
+    _chatHistory = _loadSanitizedList(prefs.getString('local_chat_history'));
+    _taskHistory = _loadSanitizedList(prefs.getString('local_task_history'));
 
     String? localHistory = prefs.getString('local_history');
     if (localHistory != null) {
@@ -99,6 +105,34 @@ class NeuroSettings extends ChangeNotifier {
       }
       notifyListeners();
     });
+  }
+
+  List<Map<String, String>> _loadSanitizedList(String? jsonString) {
+    if (jsonString == null) return [];
+    try {
+      final List<dynamic> raw = json.decode(jsonString);
+      return raw.map((e) {
+        // Ensure strictly Map<String, String> and no nulls
+        final map = Map<String, String>.from(e);
+        if (map['role'] == null || map['text'] == null) return null;
+        return map;
+      }).whereType<Map<String, String>>().toList();
+    } catch (e) {
+      print("Found corrupted history, discarding: $e");
+      return [];
+    }
+  }
+
+  Future<void> clearAllData() async {
+    _chatHistory.clear();
+    _taskHistory.clear();
+    _profile.clear();
+    _streakCount = 0;
+    
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear(); // Wipes local storage
+    
+    notifyListeners();
   }
 
   // --- AUTHENTICATION ---
@@ -227,86 +261,58 @@ class NeuroSettings extends ChangeNotifier {
   Future<void> _syncFromCloud() async {
     if (currentUser == null) return;
     try {
-      final docRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser!.uid);
-      final doc = await docRef.get();
-
+      final doc = await FirebaseFirestore.instance.collection('users').doc(currentUser!.uid).get();
       if (doc.exists && doc.data() != null) {
         final data = doc.data()!;
-
-        // 1. Decrypt Profile
-        if (data.containsKey('encrypted_profile')) {
-          Map<String, String> cloudProfile = _decryptMap(
-            data['encrypted_profile'],
-          );
-          _profile.addAll(cloudProfile); // Merge cloud into local
+        if (data.containsKey('encrypted_profile')) _profile.addAll(_decryptMap(data['encrypted_profile']));
+        
+        if (data.containsKey('encrypted_chat_history')) {
+           _chatHistory = _sanitizeDecryptedList(_decryptList(data['encrypted_chat_history']));
         }
-
-        // 2. Decrypt History
-        if (data.containsKey('encrypted_history')) {
-          List<dynamic> decryptedList = _decryptList(data['encrypted_history']);
-          // Merge strategies can vary, here we simply overwrite local with cloud if cloud is newer/larger
-          // or just append. For simplicity, we load cloud history.
-          if (decryptedList.isNotEmpty) {
-            _history = decryptedList
-                .map((e) => Map<String, String>.from(e))
-                .toList();
-          }
+        if (data.containsKey('encrypted_task_history')) {
+           _taskHistory = _sanitizeDecryptedList(_decryptList(data['encrypted_task_history']));
         }
-
-        if (data.containsKey('streak')) {
-          int cloudStreak = data['streak'];
-          if (cloudStreak > _streakCount) _streakCount = cloudStreak;
-        }
-
-        // Save merged data back to local
+        if (data.containsKey('streak')) _streakCount = data['streak'];
         _saveToLocal();
         notifyListeners();
-      } else {
-        // First time user in cloud -> Upload local guest data
-        _saveToCloud();
       }
-    } catch (e) {
-      print("Sync Error: $e");
-    }
+    } catch (e) { print("Sync Error: $e"); }
+  }
+
+  // Helper for Cloud Data
+  List<Map<String, String>> _sanitizeDecryptedList(List<dynamic> list) {
+    return list.map((e) {
+      try {
+        final map = Map<String, String>.from(e);
+        if (map['text'] == null) return null;
+        return map;
+      } catch (_) { return null; }
+    }).whereType<Map<String, String>>().toList();
   }
 
   Future<void> _saveToCloud() async {
     if (currentUser == null) return;
     try {
       final encrypter = enc.Encrypter(enc.AES(_encKey));
+      String encProfile = encrypter.encrypt(json.encode(_profile), iv: _iv).base64;
+      String encChat = encrypter.encrypt(json.encode(_chatHistory), iv: _iv).base64;
+      String encTask = encrypter.encrypt(json.encode(_taskHistory), iv: _iv).base64;
 
-      // Encrypt Profile
-      String encryptedProfile = encrypter
-          .encrypt(json.encode(_profile), iv: _iv)
-          .base64;
-
-      // Encrypt History
-      String encryptedHistory = encrypter
-          .encrypt(json.encode(_history), iv: _iv)
-          .base64;
-
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser!.uid)
-          .set({
-            'encrypted_profile': encryptedProfile,
-            'encrypted_history': encryptedHistory,
-            'streak': _streakCount,
-            'last_updated': FieldValue.serverTimestamp(),
-            'email':
-                currentUser!.email, // Useful for admin debugging (optional)
-          }, SetOptions(merge: true));
-    } catch (e) {
-      print("Cloud Save Error: $e");
-    }
+      await FirebaseFirestore.instance.collection('users').doc(currentUser!.uid).set({
+        'encrypted_profile': encProfile,
+        'encrypted_chat_history': encChat,
+        'encrypted_task_history': encTask,
+        'streak': _streakCount,
+        'last_updated': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) { print("Cloud Save Error: $e"); }
   }
 
   Future<void> _saveToLocal() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('local_profile', json.encode(_profile));
-    await prefs.setString('local_history', json.encode(_history));
+    await prefs.setString('local_chat_history', json.encode(_chatHistory));
+    await prefs.setString('local_task_history', json.encode(_taskHistory));
     await prefs.setInt('streak', _streakCount);
   }
 
