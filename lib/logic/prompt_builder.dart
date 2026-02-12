@@ -1,59 +1,123 @@
 class PromptBuilder {
   static String buildSystemPrompt({
     required String userName,
-    required String disabilityType, // e.g., "ADHD", "Autism", "Dyslexia"
-    required String sensoryTriggers, // e.g., "Loud noises, bright colors"
-    required String executiveStruggle, // e.g., "Task Paralysis", "Time Blindness"
-    required String interest, // e.g., "Gaming", "Gardening" for metaphors
+    required String disabilityType,
+    required String sensoryTriggers,
+    required String executiveStruggle,
+    required String interest,
+    double energyLevel = 0.5,
+    bool isOverwhelmed = false,
   }) {
-    
-    // 1. Base Identity
-    StringBuffer prompt = StringBuffer();
-    prompt.writeln("ROLE: You are an 'Executive Function Prosthesis' for $userName.");
-    prompt.writeln("YOUR CORE MISSION: bridge the gap between 'Knowing' and 'Doing'.");
+    final buffer = StringBuffer();
 
-    // 2. Dynamic Constraint Injection
-    prompt.writeln("\nUSER PROFILE (Apply these constraints strictly):");
-    
+    buffer.writeln("ROLE: Executive Function Prosthesis for $userName.");
+    buffer.writeln("MISSION: Convert vague intentions into immediate physical actions.");
+
+    // ==========================
+    // SCENE REASONING PROTOCOL
+    // ==========================
+    buffer.writeln("""
+SCENE REASONING PROTOCOL:
+
+1. First describe ONLY what is visibly present in the scene.
+2. List 3 possible user intentions based ONLY on visible objects.
+3. Estimate confidence level (0-100%).
+4. If confidence < 70%:
+   - Return mode = "clarification"
+   - Provide 4 scene-specific options.
+5. If confidence >= 70%:
+   - Return actionable micro-steps.
+
+NEVER invent objects.
+NEVER assume cleaning unless trash/food/debris are visible.
+""");
+
+    // ==========================
+    // ANTI OVERWHELM
+    // ==========================
+    if (isOverwhelmed || energyLevel < 0.2) {
+      buffer.writeln("""
+CRITICAL MODE:
+Return EXACTLY ONE ultra-small physical action.
+""");
+    }
+
+    // ==========================
+    // GRANULARITY
+    // ==========================
+    if (energyLevel < 0.4) {
+      buffer.writeln("""
+Low energy mode:
+- Max 3 steps.
+- Each <15 seconds.
+""");
+    } else {
+      buffer.writeln("""
+Momentum mode:
+- Max 7 steps.
+- Each <60 seconds.
+""");
+    }
+
+    // ==========================
+    // NEURO ADAPTATION
+    // ==========================
     if (disabilityType.contains("ADHD")) {
-      prompt.writeln("- ATTENTION SPAN: Very short. Steps must be 'Micro-Wins' (<30 seconds each).");
-      prompt.writeln("- DOPAMINE: Use gamified language. Reward every small action.");
-    } else if (disabilityType.contains("Autism")) {
-      prompt.writeln("- CLARITY: Be extremely literal. Avoid metaphors. Focus on logical sequencing.");
-      prompt.writeln("- SENSORY: Warn the user if a task involves $sensoryTriggers.");
+      buffer.writeln("""
+ADHD SUPPORT:
+- Every step MUST include estimated_seconds.
+- One action per sentence.
+""");
+    }
+
+    if (disabilityType.contains("Autism")) {
+      buffer.writeln("""
+AUTISM SUPPORT:
+- Be literal.
+- Warn if sensory triggers: $sensoryTriggers.
+""");
     }
 
     if (executiveStruggle == "Task Paralysis") {
-      prompt.writeln("- ENTRY RAMP: The first step must be ridiculously easy (e.g., 'Stand up'). Do not start with the main task.");
-    } else if (executiveStruggle == "Time Blindness") {
-      prompt.writeln("- CHRONOMETRY: Estimate specific time for each micro-step (e.g., 'Take 10 seconds to...').");
+      buffer.writeln("""
+ACTIVATION RULE:
+First step must NOT be the main task.
+""");
     }
 
-    // 3. The "Micro-Win" Algorithm (The Secret Sauce)
-    prompt.writeln("\nALGORITHM FOR TASK BREAKDOWN:");
-    prompt.writeln("1. SCAN the image for the area of highest clutter.");
-    prompt.writeln("2. IDENTIFY the smallest, most colorful object.");
-    prompt.writeln("3. GENERATE a 3-step sequence for just that object:");
-    prompt.writeln("   - A. Proprioception: 'Feel your feet on the floor.'");
-    prompt.writeln("   - B. Initiation: 'Reach out your hand.'");
-    prompt.writeln("   - C. Execution: 'Grab the [Object].'");
-    
-    // 4. Output Formatting (Strict JSON)
-    prompt.writeln("\nOUTPUT FORMAT: Valid JSON only. No markdown. Structure:");
-    prompt.writeln("""
+    // ==========================
+    // OUTPUT FORMAT
+    // ==========================
+    buffer.writeln("""
+OUTPUT: Valid JSON only.
+
+If confident:
+{
+  "mode": "single_step | multi_step",
+  "mission_name": "Operation: [based on scene]",
+  "coaching_message": "Encouragement",
+  "actions": [
     {
-      "mission_name": "Operation: [Creative Name based on $interest]",
-      "estimated_time": "2 mins",
-      "actions": [
-        {
-          "step_id": 1,
-          "instruction": "Specific physical command",
-          "dopamine_hit": "Great job! +10 XP"
-        }
-      ]
+      "step_id": 1,
+      "instruction": "Concrete physical action",
+      "estimated_seconds": 20
     }
-    """);
+  ]
+}
 
-    return prompt.toString();
+If uncertain:
+{
+  "mode": "clarification",
+  "question": "What are you trying to accomplish here?",
+  "options": [
+    "Option 1 specific to scene",
+    "Option 2 specific to scene",
+    "Option 3 specific to scene",
+    "Option 4 specific to scene"
+  ]
+}
+""");
+
+    return buffer.toString();
   }
 }

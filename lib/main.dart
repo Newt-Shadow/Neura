@@ -1,39 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_core/firebase_core.dart'; // <--- REQUIRED
-import 'firebase_options.dart'; // <--- REQUIRED
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'localization/app_strings.dart';
+
 import 'logic/neuro_settings.dart';
 import 'ui/smart_dashboard_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load ENV FIRST
   await dotenv.load(fileName: ".env");
-  
-  // 1. INITIALIZE FIREBASE (Fixes Blank Screen)
+
+  print("Loaded ENV KEY: ${dotenv.env['GEMINI_API_KEY']}");
+
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
   } catch (e) {
-    print("Firebase Error: $e"); // Continue even if Firebase fails (Guest Mode)
+    print("Firebase Error: $e");
   }
 
-  // 2. Load Strings
-  final appStrings = AppStrings();
-  try { await appStrings.loadFromAsset('assets/strings_en.json'); } catch (_) {}
-
-  // 3. Load Settings (Now safe to use Firebase)
   final neuroSettings = NeuroSettings();
-  await neuroSettings.loadSettings(); 
-  
+  await neuroSettings.loadSettings();
+
   runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider.value(value: appStrings),
-        ChangeNotifierProvider.value(value: neuroSettings),
-      ],
+    ChangeNotifierProvider(
+      create: (_) => neuroSettings,
       child: const MyApp(),
     ),
   );
@@ -45,23 +40,16 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<NeuroSettings>();
-    
+
     return MaterialApp(
-      title: 'Neura',
       debugShowCheckedModeBanner: false,
+      title: "Neura",
       theme: ThemeData(
-        fontFamily: settings.fontFamily, // Uses your Dyslexic Font setting
+        fontFamily: settings.fontFamily,
+        brightness:
+            settings.highContrast ? Brightness.dark : Brightness.light,
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.teal,
-          brightness: settings.highContrast ? Brightness.dark : Brightness.light,
-          background: settings.highContrast ? Colors.black : Colors.grey[50],
-        ),
-        appBarTheme: const AppBarTheme(
-          centerTitle: true,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-        ),
+        colorSchemeSeed: Colors.teal,
       ),
       home: const SmartDashboardScreen(),
     );

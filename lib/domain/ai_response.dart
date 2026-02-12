@@ -1,30 +1,56 @@
-enum AIResponseType { question, plan }
+// lib/domain/ai_response.dart
+
+class MicroStep {
+  final int stepId;
+  final String instruction;
+  final int estimatedSeconds;
+
+  MicroStep({
+    required this.stepId,
+    required this.instruction,
+    required this.estimatedSeconds,
+  });
+
+  factory MicroStep.fromJson(Map<String, dynamic> json) {
+    return MicroStep(
+      stepId: json['step_id'] ?? 0,
+      instruction: json['instruction'] ?? "Take a breath.",
+      estimatedSeconds: json['estimated_seconds'] ?? 30,
+    );
+  }
+}
 
 class AIResponse {
-  final AIResponseType type;
-  final String message;
-  final List<dynamic>? actions;
+  final String mode; // single_step | multi_step | clarification
+
+  final String missionName;
+  final String coachingMessage;
+  final List<MicroStep> actions;
+
+  final String? question;
   final List<String>? options;
-  final List<int>? box2d; // [ymin, xmin, ymax, xmax]
-  final Map<String, String>? profileUpdates;
 
   AIResponse({
-    required this.type,
-    required this.message,
-    this.actions,
+    required this.mode,
+    required this.missionName,
+    required this.coachingMessage,
+    required this.actions,
+    this.question,
     this.options,
-    this.box2d,
-    this.profileUpdates,
   });
 
   factory AIResponse.fromJson(Map<String, dynamic> json) {
     return AIResponse(
-      type: json['type'] == 'options' ? AIResponseType.question : AIResponseType.plan,
-      message: json['question'] ?? json['message'] ?? json['motivation'] ?? "Ready.",
-      actions: json['actions'],
-      options: json['options'] != null ? List<String>.from(json['options']) : null,
-      box2d: json['box_2d'] != null ? List<int>.from(json['box_2d']) : null,
-      profileUpdates: json['learnings'] != null ? Map<String, String>.from(json['learnings']) : null,
+      mode: json['mode'] ?? "single_step",
+      missionName: json['mission_name'] ?? "New Quest",
+      coachingMessage: json['coaching_message'] ?? "You've got this.",
+      actions: (json['actions'] as List? ?? [])
+          .map((e) => MicroStep.fromJson(e))
+          .toList(),
+      question: json['question'],
+      options: json['options'] != null
+          ? List<String>.from(json['options'])
+          : null,
     );
   }
 }

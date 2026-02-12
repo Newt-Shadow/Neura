@@ -143,15 +143,7 @@ class _ArTaskScreenState extends State<ArTaskScreen> with WidgetsBindingObserver
       );
 
       // 4. Update UI (Only if still on screen)
-      if (mounted) {
-        if (response != null && response.box2d != null) {
-          setState(() => _currentArBox = List<int>.from(response.box2d!));
-          _tts.speak("Found it! Look for the green box.");
-        } else {
-          _tts.speak("I can't see it clearly here. Try moving the camera.");
-          setState(() => _currentArBox = null);
-        }
-      }
+      
     } catch (e) {
       if (mounted) _tts.speak("Error scanning.");
     } finally {
