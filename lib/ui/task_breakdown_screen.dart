@@ -4,31 +4,29 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:provider/provider.dart';
 import 'dart:typed_data';
 import 'package:image/image.dart' as img;
-
+import 'dart:convert'; 
 import '../logic/remote_ai_service.dart';
 import '../logic/neuro_settings.dart';
 import '../logic/model_holder.dart';
 import '../logic/pii_masker.dart';
 import '../domain/ai_response.dart';
 import 'interactive_task_screen.dart';
+import '../logic/local_llm_service.dart';
+import '../logic/offline_vision_service.dart';
 
 class TaskBreakdownScreen extends StatefulWidget {
   const TaskBreakdownScreen({super.key});
 
   @override
-  State<TaskBreakdownScreen> createState() =>
-      _TaskBreakdownScreenState();
+  State<TaskBreakdownScreen> createState() => _TaskBreakdownScreenState();
 }
 
-class _TaskBreakdownScreenState
-    extends State<TaskBreakdownScreen> {
-
+class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
   bool _forceTextMode = false;
 
   final ImagePicker _picker = ImagePicker();
   final stt.SpeechToText _speech = stt.SpeechToText();
-  final TextEditingController _textController =
-      TextEditingController();
+  final TextEditingController _textController = TextEditingController();
 
   Uint8List? _pendingImageBytes;
   Uint8List? _sessionImageBytes;
@@ -44,8 +42,7 @@ class _TaskBreakdownScreenState
 
   Future<void> _pickAttachment() async {
     if (_isLoading) return;
-    final XFile? media =
-        await _picker.pickImage(source: ImageSource.camera);
+    final XFile? media = await _picker.pickImage(source: ImageSource.camera);
 
     if (media == null) return;
 
@@ -60,14 +57,11 @@ class _TaskBreakdownScreenState
     // _processTaskRequest(imageBytes: compressed);
   }
 
-  Future<Uint8List> _compressImage(
-      Uint8List rawBytes) async {
+  Future<Uint8List> _compressImage(Uint8List rawBytes) async {
     final decoded = img.decodeImage(rawBytes);
     if (decoded == null) return rawBytes;
-    final resized =
-        img.copyResize(decoded, width: 800);
-    return Uint8List.fromList(
-        img.encodeJpg(resized, quality: 75));
+    final resized = img.copyResize(decoded, width: 800);
+    return Uint8List.fromList(img.encodeJpg(resized, quality: 75));
   }
 
   // ==========================================================
@@ -95,9 +89,9 @@ class _TaskBreakdownScreenState
     );
 
     // 🔥 Manual mode → ignore image
-  _textController.clear();
+    _textController.clear();
     setState(() {
-      _pendingImageBytes = null; 
+      _pendingImageBytes = null;
     });
   }
 
@@ -115,71 +109,93 @@ class _TaskBreakdownScreenState
     });
 
     try {
-      final settings =
-          context.read<NeuroSettings>();
+      final settings = context.read<NeuroSettings>();
+      String finalQuery = PIIMasker.mask(textInput ?? "");
 
-      String safeQuery =
-          PIIMasker.mask(textInput ?? "");
+      String safeQuery = PIIMasker.mask(textInput ?? "");
 
-      if (imageBytes != null &&
-          safeQuery.isEmpty) {
-        safeQuery =
-            "Analyze this scene and determine possible goals.";
+      if (imageBytes != null) {
+        setState(() => _statusMessage = "Scanning objects (Offline)...");
+        final detectedObjects = await OfflineVisionService.analyzeImage(
+          imageBytes,
+        );
+
+        if (detectedObjects.isNotEmpty) {
+          finalQuery += "\n\n[Context] I see: ${detectedObjects.join(', ')}";
+          print("✅ Vision detected: $detectedObjects");
+        }
       }
 
-      final response =
-          await RemoteAIService.processRequest(
-        userQuery: safeQuery,
-        imageBytes: imageBytes,
-        userSettings: settings,
-        energy: _currentEnergy,
-        isOverwhelmed: _isOverwhelmed,
-      );
+      AIResponse? aiResponse;
+
+      if (imageBytes == null) {
+        try {
+          setState(() => _statusMessage = "Thinking (On-Device)...");
+
+          // Ask Gemma
+          final localText = await LocalLLMService.generateResponse(
+            "You are a helpful planner. Output valid JSON for this goal: $finalQuery",
+          );
+
+          if (localText != null && localText.contains("{")) {
+            // Basic JSON extraction
+            final startIndex = localText.indexOf('{');
+            final endIndex = localText.lastIndexOf('}');
+            final jsonStr = localText.substring(startIndex, endIndex + 1);
+
+            aiResponse = AIResponse.fromJson(json.decode(jsonStr));
+          }
+        } catch (e) {
+          print("⚠️ Local Gemma passed. Switching to Cloud.");
+        }
+      }
+
+      // ------------------------------------------------------------
+      // 3. CLOUD FALLBACK
+      // ------------------------------------------------------------
+      if (aiResponse == null) {
+        setState(() => _statusMessage = "Connecting to Cloud...");
+        aiResponse = await RemoteAIService.processRequest(
+          userQuery: finalQuery,
+          imageBytes: imageBytes,
+          userSettings: settings,
+          energy: _currentEnergy,
+          isOverwhelmed: _isOverwhelmed,
+        );
+      }
 
       if (!mounted) return;
 
-      // 🔥 Clarification mode
-      if (response.mode ==
-          "clarification") {
-        _showClarificationDialog(
-            response, safeQuery);
-        return;
-      }
-
-      // 🔥 Task mode
-      if (response.actions.isNotEmpty) {
+      // 4. Handle Result
+      if (aiResponse!.mode == "clarification") {
+        _showClarificationDialog(aiResponse, finalQuery);
+      } else if (aiResponse.actions.isNotEmpty) {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) =>
-                InteractiveTaskScreen(
-              response: response,
-              dyslexiaMode:
-                  settings.dyslexiaMode,
+            builder: (_) => InteractiveTaskScreen(
+              response: aiResponse!,
+              dyslexiaMode: settings.dyslexiaMode,
             ),
           ),
         );
       }
     } catch (e) {
-      _showErrorMessage(
-          "Something went wrong.");
+      _showErrorMessage("Connection failed. Try again.");
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   // ==========================================================
-  // 🔥 DYNAMIC CLARIFICATION UI
-  // ==========================================================
-
-  // ==========================================================
-  // 🔥 DYNAMIC CLARIFICATION UI (FIXED)
+  // DYNAMIC CLARIFICATION UI (FIXED)
   // ==========================================================
 
   void _showClarificationDialog(AIResponse response, String contextText) {
-    final dynamicOptions = _generateDynamicOptions(response.options, contextText);
+    final dynamicOptions = _generateDynamicOptions(
+      response.options,
+      contextText,
+    );
 
     showModalBottomSheet(
       context: context,
@@ -193,29 +209,34 @@ class _TaskBreakdownScreenState
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
-            ...dynamicOptions.map((option) => ListTile(
-                  title: Text(option),
-                  onTap: () {
-                    Navigator.pop(context);
+            ...dynamicOptions
+                .map(
+                  (option) => ListTile(
+                    title: Text(option),
+                    onTap: () {
+                      Navigator.pop(context);
 
-                    if (option == "I will type my goal") {
-                      setState(() {
-                        _forceTextMode = true;
-                        _pendingImageBytes = null;
-                        _sessionImageBytes = null;
-                      });
-                      return;
-                    }
+                      if (option == "I will type my goal") {
+                        setState(() {
+                          _forceTextMode = true;
+                          _pendingImageBytes = null;
+                          _sessionImageBytes = null;
+                        });
+                        return;
+                      }
 
-                    String combinedContext = "Context: The AI asked '${response.question}'. User replied: '$option'. Create a plan.";
+                      String combinedContext =
+                          "Context: The AI asked '${response.question}'. User replied: '$option'. Create a plan.";
 
-                    // FIX: Pass _pendingImageBytes so the AI can "see" the scene again
-                    _processTaskRequest(
-                      textInput: option, 
-                      imageBytes: _sessionImageBytes
-                    );
-                  },
-                )).toList(),
+                      // FIX: Pass _pendingImageBytes so the AI can "see" the scene again
+                      _processTaskRequest(
+                        textInput: option,
+                        imageBytes: _sessionImageBytes,
+                      );
+                    },
+                  ),
+                )
+                .toList(),
           ],
         ),
       ),
@@ -227,60 +248,40 @@ class _TaskBreakdownScreenState
   // ==========================================================
 
   List<String> _generateDynamicOptions(
-      List<String>? aiOptions,
-      String contextText) {
+    List<String>? aiOptions,
+    String contextText,
+  ) {
+    final options = <String>[];
 
-    final options =
-        <String>[];
-
-    if (aiOptions != null &&
-        aiOptions.isNotEmpty) {
+    if (aiOptions != null && aiOptions.isNotEmpty) {
       options.addAll(aiOptions);
     }
 
-    final lower =
-        contextText.toLowerCase();
+    final lower = contextText.toLowerCase();
 
-    if (lower.contains("desk") ||
-        lower.contains("study")) {
-      options.addAll([
-        "Start studying",
-        "Organize books",
-      ]);
+    if (lower.contains("desk") || lower.contains("study")) {
+      options.addAll(["Start studying", "Organize books"]);
     }
 
     if (lower.contains("kitchen")) {
-      options.addAll([
-        "Cook something simple",
-        "Clean the counter",
-      ]);
+      options.addAll(["Cook something simple", "Clean the counter"]);
     }
 
-    if (lower.contains("bed") ||
-        lower.contains("room")) {
-      options.addAll([
-        "Make the bed",
-        "Pick up clothes",
-      ]);
+    if (lower.contains("bed") || lower.contains("room")) {
+      options.addAll(["Make the bed", "Pick up clothes"]);
     }
 
-    if (!options.contains(
-        "I will type my goal")) {
-      options.add(
-          "I will type my goal");
+    if (!options.contains("I will type my goal")) {
+      options.add("I will type my goal");
     }
 
-    return options
-        .toSet()
-        .toList();
+    return options.toSet().toList();
   }
 
-  void _showErrorMessage(
-      String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+  void _showErrorMessage(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   // ==========================================================
@@ -307,8 +308,14 @@ class _TaskBreakdownScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("Image attached", style: TextStyle(fontWeight: FontWeight.bold)),
-                Text("Ready to send", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                Text(
+                  "Image attached",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  "Ready to send",
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
               ],
             ),
           ),
@@ -328,29 +335,20 @@ class _TaskBreakdownScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-            "Neuro"),
-      ),
+      appBar: AppBar(title: const Text("Neuro")),
       body: Column(
         children: [
           Expanded(
             child: _isLoading
-                ? Center(
-                    child: Text(
-                        _statusMessage))
+                ? Center(child: Text(_statusMessage))
                 : const Center(
                     child: Text(
                       "I am Iron Man !",
-                      style: TextStyle(
-                          fontSize: 18,
-                          color:
-                              Colors.grey),
+                      style: TextStyle(fontSize: 18, color: Colors.grey),
                     ),
                   ),
           ),
-          if (_pendingImageBytes != null) 
-            _buildImagePreview(),
+          if (_pendingImageBytes != null) _buildImagePreview(),
           _buildInputBar(),
         ],
       ),
@@ -359,47 +357,32 @@ class _TaskBreakdownScreenState
 
   Widget _buildInputBar() {
     return Container(
-      padding:
-          const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(
-          top: BorderSide(
-              color:
-                  Colors.grey.shade200),
-        ),
+        border: Border(top: BorderSide(color: Colors.grey.shade200)),
       ),
       child: SafeArea(
         child: Row(
           children: [
             IconButton(
-              icon: const Icon(
-                  Icons.add_a_photo),
-              onPressed:
-                  _pickAttachment,
+              icon: const Icon(Icons.add_a_photo),
+              onPressed: _pickAttachment,
             ),
             Expanded(
               child: TextField(
-                controller:
-                    _textController,
-                decoration:
-                    const InputDecoration(
-                  hintText:
-                      "What's the goal?",
-                  border:
-                      InputBorder.none,
+                controller: _textController,
+                decoration: const InputDecoration(
+                  hintText: "What's the goal?",
+                  border: InputBorder.none,
                 ),
               ),
             ),
             FloatingActionButton(
               mini: true,
-              onPressed:
-                  _sendMessage,
-              backgroundColor:
-                  Colors.teal,
-              child: const Icon(
-                  Icons.arrow_upward,
-                  color: Colors.white),
+              onPressed: _sendMessage,
+              backgroundColor: Colors.teal,
+              child: const Icon(Icons.arrow_upward, color: Colors.white),
             ),
           ],
         ),
