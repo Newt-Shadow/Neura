@@ -31,6 +31,7 @@ class _TaskBreakdownScreenState
       TextEditingController();
 
   Uint8List? _pendingImageBytes;
+  Uint8List? _sessionImageBytes;
   bool _isLoading = false;
   String _statusMessage = "";
 
@@ -42,6 +43,7 @@ class _TaskBreakdownScreenState
   // ==========================================================
 
   Future<void> _pickAttachment() async {
+    if (_isLoading) return;
     final XFile? media =
         await _picker.pickImage(source: ImageSource.camera);
 
@@ -55,7 +57,7 @@ class _TaskBreakdownScreenState
       _forceTextMode = false; // image mode active
     });
 
-    _processTaskRequest(imageBytes: compressed);
+    // _processTaskRequest(imageBytes: compressed);
   }
 
   Future<Uint8List> _compressImage(
@@ -73,32 +75,30 @@ class _TaskBreakdownScreenState
   // ==========================================================
 
   void _sendMessage() {
+    if (_isLoading) return;
     final text = _textController.text.trim();
 
-    if (text.isEmpty && _pendingImageBytes == null)
-      return;
+    if (text.isEmpty && _pendingImageBytes == null) return;
+
+    if (_pendingImageBytes != null) {
+      _sessionImageBytes = _pendingImageBytes;
+    }
 
     if (text.toLowerCase().contains("overwhelmed") ||
         text.toLowerCase().contains("stuck")) {
       _isOverwhelmed = true;
     }
 
-    // 🔥 Manual mode → ignore image
-    if (_forceTextMode) {
-      _processTaskRequest(
-        textInput: text,
-        imageBytes: null,
-      );
-      _textController.clear();
-      return;
-    }
-
     _processTaskRequest(
       textInput: text,
-      imageBytes: _pendingImageBytes,
+      imageBytes: _forceTextMode ? null : _pendingImageBytes,
     );
 
-    _textController.clear();
+    // 🔥 Manual mode → ignore image
+  _textController.clear();
+    setState(() {
+      _pendingImageBytes = null; 
+    });
   }
 
   // ==========================================================
@@ -174,63 +174,48 @@ class _TaskBreakdownScreenState
   // 🔥 DYNAMIC CLARIFICATION UI
   // ==========================================================
 
-  void _showClarificationDialog(
-      AIResponse response,
-      String contextText) {
+  // ==========================================================
+  // 🔥 DYNAMIC CLARIFICATION UI (FIXED)
+  // ==========================================================
 
-    final dynamicOptions =
-        _generateDynamicOptions(
-            response.options,
-            contextText);
+  void _showClarificationDialog(AIResponse response, String contextText) {
+    final dynamicOptions = _generateDynamicOptions(response.options, contextText);
 
     showModalBottomSheet(
       context: context,
       builder: (_) => Container(
-        padding:
-            const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         child: Column(
-          mainAxisSize:
-              MainAxisSize.min,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              response.question ??
-                  "What would you like to do?",
-              style:
-                  const TextStyle(
-                      fontSize: 18,
-                      fontWeight:
-                          FontWeight.bold),
+              response.question ?? "What would you like to do?",
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
+            ...dynamicOptions.map((option) => ListTile(
+                  title: Text(option),
+                  onTap: () {
+                    Navigator.pop(context);
 
-            ...dynamicOptions
-                .map((option) =>
-                    ListTile(
-                      title:
-                          Text(option),
-                      onTap: () {
-                        Navigator.pop(
-                            context);
+                    if (option == "I will type my goal") {
+                      setState(() {
+                        _forceTextMode = true;
+                        _pendingImageBytes = null;
+                        _sessionImageBytes = null;
+                      });
+                      return;
+                    }
 
-                        if (option ==
-                            "I will type my goal") {
-                          setState(() {
-                            _forceTextMode =
-                                true;
-                            _pendingImageBytes =
-                                null;
-                          });
-                          return;
-                        }
+                    String combinedContext = "Context: The AI asked '${response.question}'. User replied: '$option'. Create a plan.";
 
-                        _processTaskRequest(
-                            textInput:
-                                option,
-                            imageBytes:
-                                null);
-                      },
-                    ))
-                .toList(),
+                    // FIX: Pass _pendingImageBytes so the AI can "see" the scene again
+                    _processTaskRequest(
+                      textInput: option, 
+                      imageBytes: _sessionImageBytes
+                    );
+                  },
+                )).toList(),
           ],
         ),
       ),
@@ -302,12 +287,50 @@ class _TaskBreakdownScreenState
   // UI
   // ==========================================================
 
+  Widget _buildImagePreview() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: Colors.grey.shade50,
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.memory(
+              _pendingImageBytes!,
+              height: 60,
+              width: 60,
+              fit: BoxFit.cover,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("Image attached", style: TextStyle(fontWeight: FontWeight.bold)),
+                Text("Ready to send", style: TextStyle(fontSize: 12, color: Colors.grey)),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.red),
+            onPressed: () {
+              setState(() {
+                _pendingImageBytes = null;
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-            "Micro-Win Planner"),
+            "Neuro"),
       ),
       body: Column(
         children: [
@@ -318,7 +341,7 @@ class _TaskBreakdownScreenState
                         _statusMessage))
                 : const Center(
                     child: Text(
-                      "Ready to break it into Micro-Wins.",
+                      "I am Iron Man !",
                       style: TextStyle(
                           fontSize: 18,
                           color:
@@ -326,6 +349,8 @@ class _TaskBreakdownScreenState
                     ),
                   ),
           ),
+          if (_pendingImageBytes != null) 
+            _buildImagePreview(),
           _buildInputBar(),
         ],
       ),

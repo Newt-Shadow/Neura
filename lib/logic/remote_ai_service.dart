@@ -24,6 +24,7 @@ class RemoteAIService {
 
     try {
       final safeQuery = PIIMasker.mask(userQuery);
+      final bool hasImage = imageBytes != null;
 
       final systemPrompt = PromptBuilder.buildSystemPrompt(
         userName: userSettings.userName,
@@ -33,6 +34,7 @@ class RemoteAIService {
         interest: userSettings.interest,
         energyLevel: energy,
         isOverwhelmed: isOverwhelmed,
+        hasImage: hasImage,
       );
 
       final model = GenerativeModel(
@@ -41,7 +43,7 @@ class RemoteAIService {
         generationConfig: GenerationConfig(
           responseMimeType: 'application/json',
           temperature: 0.6,
-          maxOutputTokens: 800,
+          maxOutputTokens: 4096,
         ),
         systemInstruction: Content.system(systemPrompt),
       );
@@ -65,14 +67,29 @@ class RemoteAIService {
 
       final response = await model.generateContent(content);
 
+      print("🔍 RAW AI RESPONSE: ${response.text}");
+
       if (response.text == null || response.text!.isEmpty) {
         return _errorResponse("No response received.");
       }
 
-      final cleanText = response.text!
-          .replaceAll('```json', '')
-          .replaceAll('```', '')
-          .trim();
+      String cleanText = response.text!;
+
+      // 1. Remove Markdown code blocks if present
+      cleanText = cleanText.replaceAll('```json', '').replaceAll('```', '');
+
+      // 2. Find the start and end of the JSON object
+      final startIndex = cleanText.indexOf('{');
+      final endIndex = cleanText.lastIndexOf('}');
+
+      if (startIndex != -1 && endIndex != -1) {
+        // Extract ONLY the part between { and }
+        cleanText = cleanText.substring(startIndex, endIndex + 1);
+      } else {
+        // If no curly braces found, it's a real failure
+        print("❌ JSON PARSING FAILED: No braces found in: $cleanText");
+        throw const FormatException("Invalid JSON format");
+      }
 
       final decoded = json.decode(cleanText);
       return AIResponse.fromJson(decoded);

@@ -5,32 +5,52 @@ class PromptBuilder {
     required String sensoryTriggers,
     required String executiveStruggle,
     required String interest,
+    required bool hasImage,
     double energyLevel = 0.5,
     bool isOverwhelmed = false,
   }) {
     final buffer = StringBuffer();
 
     buffer.writeln("ROLE: Executive Function Prosthesis for $userName.");
-    buffer.writeln("MISSION: Convert vague intentions into immediate physical actions.");
+    buffer.writeln(
+      "MISSION: Convert vague intentions into immediate physical actions.",
+    );
 
     // ==========================
     // SCENE REASONING PROTOCOL
     // ==========================
-    buffer.writeln("""
-SCENE REASONING PROTOCOL:
 
-1. First describe ONLY what is visibly present in the scene.
-2. List 3 possible user intentions based ONLY on visible objects.
-3. Estimate confidence level (0-100%).
-4. If confidence < 70%:
-   - Return mode = "clarification"
-   - Provide 4 scene-specific options.
-5. If confidence >= 70%:
-   - Return actionable micro-steps.
+    if (hasImage) {
+      buffer.writeln("""
+SCENE REASONING PROTOCOL (IMAGE PROVIDED):
 
-NEVER invent objects.
-NEVER assume cleaning unless trash/food/debris are visible.
+STEP 1: CHECK USER TEXT
+- Does the user's text contain a specific goal? (e.g., "Clean this", "Find my keys", "Study").
+- IF YES: IGNORE visual ambiguity. Trust the text. EXECUTE IMMEDIATELY. (Confidence = 100%).
+
+STEP 2: CHECK VISUALS (Only if text is empty/vague)
+- Analyze the image.
+- Is there ONE dominant task? (e.g., A sink overflowing with dishes).
+- IF YES: Assume that is the goal. EXECUTE IMMEDIATELY.
+
+STEP 3: CLARIFICATION (The Last Resort)
+- Only return mode="clarification" if:
+  A) The text is empty AND the scene has multiple equal possibilities (e.g., a messy room with a bed AND a desk).
+  B) The image is too blurry/dark to see.
+- If asking, provide distinct, visually-grounded options.
+
+RULE: Never ask "Are you sure?" if the user has typed a command.
 """);
+    } else {
+      buffer.writeln("""
+TEXT REASONING PROTOCOL (NO IMAGE):
+1. Analyze the user's text input directly.
+2. DO NOT ask for visual descriptions.
+3. If the input is vague (e.g., "bored"), suggest 3 active options.
+4. If the input is specific (e.g., "write an email"), generate steps immediately.
+""");
+    }
+    
 
     // ==========================
     // ANTI OVERWHELM
@@ -89,7 +109,10 @@ First step must NOT be the main task.
     // OUTPUT FORMAT
     // ==========================
     buffer.writeln("""
-OUTPUT: Valid JSON only.
+CRITICAL OUTPUT RULES:
+- OUTPUT VALID JSON ONLY.
+- NO conversational filler (e.g., "Here is your plan").
+- START and END with curly braces { }.
 
 If confident:
 {
