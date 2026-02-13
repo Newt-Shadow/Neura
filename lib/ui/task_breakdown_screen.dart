@@ -128,27 +128,27 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
 
       AIResponse? aiResponse;
 
-      if (imageBytes == null) {
-        try {
-          setState(() => _statusMessage = "Thinking (On-Device)...");
+      // if (imageBytes == null) {
+      //   try {
+      //     setState(() => _statusMessage = "Thinking (On-Device)...");
 
-          // Ask Gemma
-          final localText = await LocalLLMService.generateResponse(
-            "You are a helpful planner. Output valid JSON for this goal: $finalQuery",
-          );
+      //     // Ask Gemma
+      //     final localText = await LocalLLMService.generateResponse(
+      //       "You are a helpful planner. Output valid JSON for this goal: $finalQuery",
+      //     );
 
-          if (localText != null && localText.contains("{")) {
-            // Basic JSON extraction
-            final startIndex = localText.indexOf('{');
-            final endIndex = localText.lastIndexOf('}');
-            final jsonStr = localText.substring(startIndex, endIndex + 1);
+      //     if (localText != null && localText.contains("{")) {
+      //       // Basic JSON extraction
+      //       final startIndex = localText.indexOf('{');
+      //       final endIndex = localText.lastIndexOf('}');
+      //       final jsonStr = localText.substring(startIndex, endIndex + 1);
 
-            aiResponse = AIResponse.fromJson(json.decode(jsonStr));
-          }
-        } catch (e) {
-          print("⚠️ Local Gemma passed. Switching to Cloud.");
-        }
-      }
+      //       aiResponse = AIResponse.fromJson(json.decode(jsonStr));
+      //     }
+      //   } catch (e) {
+      //     print("⚠️ Local Gemma passed. Switching to Cloud.");
+      //   }
+      // }
 
       // ------------------------------------------------------------
       // 3. CLOUD FALLBACK

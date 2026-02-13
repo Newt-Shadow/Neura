@@ -40,10 +40,12 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   google_mlkit_image_labeling: ^0.13.0
-  # mediapipe_genai: ^0.0.1-alpha.2
+  firebase_storage: 12.4.10
+
 
   # Vision & AR
   camera: ^0.10.5+9
+  uuid: ^4.5.2
 
 
 

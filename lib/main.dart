@@ -56,7 +56,7 @@ void main() async {
     } catch (e) {
       print("❌ Failed to load model: $e");
       // If corrupt, go to setup
-      initialScreen = const ModelSetupScreen();
+      initialScreen = const SmartDashboardScreen();
     }
   } else {
     print("⚠️ Model missing. Redirecting to setup.");
