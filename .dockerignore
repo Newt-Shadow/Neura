@@ -1,0 +1,13 @@
+.git
+.idea
+.vscode
+build
+.dart_tool
+.flutter-plugins
+.flutter-plugins-dependencies
+android/.gradle
+ios
+macos
+web
+windows
+linux
