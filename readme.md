@@ -2,7 +2,7 @@
 
 > **Empowering minds with ADHD, Autism, Dyslexia, and Anxiety through Offline AI and Executive Function Prosthetics.**
 
-[![Flutter](https://img.shields.io/badge/Flutter-3.27-blue.svg)](https://flutter.dev)
+[![Flutter](https://img.shields.io/badge/Flutter-3.41-blue.svg)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.6-blue.svg)](https://dart.dev)
 [![Gemini](https://img.shields.io/badge/Powered%20by-Gemini-orange)](https://deepmind.google/technologies/gemini/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)

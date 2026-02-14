@@ -1,7 +1,7 @@
 # ==============================================================================
 # STAGE 1: BUILDER
 # ==============================================================================
-FROM ghcr.io/cirruslabs/flutter:3.29.0 AS build
+FROM ghcr.io/cirruslabs/flutter:3.41.1 AS build
 
 # Set build arguments (optional)
 ARG BUILD_VERSION=1.0.0
