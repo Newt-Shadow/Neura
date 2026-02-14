@@ -50,7 +50,6 @@ TEXT REASONING PROTOCOL (NO IMAGE):
 4. If the input is specific (e.g., "write an email"), generate steps immediately.
 """);
     }
-    
 
     // ==========================
     // ANTI OVERWHELM
@@ -82,28 +81,98 @@ Momentum mode:
     // ==========================
     // NEURO ADAPTATION
     // ==========================
-    if (disabilityType.contains("ADHD")) {
+
+    final diagnosis = disabilityType.toUpperCase();
+    final struggle = executiveStruggle.toUpperCase();
+
+    if (diagnosis.contains("ADHD") || diagnosis.contains("ADD")) {
       buffer.writeln("""
-ADHD SUPPORT:
-- Every step MUST include estimated_seconds.
-- One action per sentence.
+ADHD MODE:
+- GAMIFY: Make steps sound like mini-quests.
+- TIME BLINDNESS: Every step MUST include 'estimated_seconds'.
+- DOPAMINE: Use energetic, encouraging language.
+- BREVITY: One action per sentence. No paragraphs.
 """);
     }
 
-    if (disabilityType.contains("Autism")) {
+    // --- AUTISM ---
+    if (diagnosis.contains("AUTISM") || diagnosis.contains("ASD")) {
       buffer.writeln("""
-AUTISM SUPPORT:
-- Be literal.
-- Warn if sensory triggers: $sensoryTriggers.
+AUTISM MODE:
+- LITERAL: Avoid idioms, metaphors, or vague encouragement.
+- SENSORY: Check task against triggers: "$sensoryTriggers".
+- LOGIC: Briefly explain the 'Why' before the 'How'.
+- END STATE: clearly define what "Finished" looks like.
 """);
     }
 
-    if (executiveStruggle == "Task Paralysis") {
+    // --- DYSLEXIA ---
+    if (diagnosis.contains("DYSLEXI")) {
       buffer.writeln("""
-ACTIVATION RULE:
-First step must NOT be the main task.
+DYSLEXIA MODE:
+- FORMAT: Use bullet points strictly.
+- VISUALS: Start every step with a relevant EMOJI.
+- CLARITY: Capitalize KEY VERBS (e.g., "PICK UP the trash").
+- SIMPLICITY: Use short, high-frequency words.
 """);
     }
+
+    // --- ANXIETY ---
+    if (diagnosis.contains("ANXIETY") || isOverwhelmed) {
+      buffer.writeln("""
+ANXIETY REDUCTION MODE:
+- TONE: Calming, grounding, non-judgmental.
+- MICRO-STEPS: Break tasks down to the absolute smallest unit (e.g., "Just stand up").
+- VALIDATION: Acknowledge that starting is the hardest part.
+""");
+    }
+
+    // ==========================
+    // 4. DYNAMIC UNIVERSAL ADAPTER (The Magic Part)
+    // ==========================
+    // This handles ANYTHING else (OCD, Chronic Pain, Depression, "Student", etc.)
+
+    buffer.writeln("""
+DYNAMIC PROFILE ADAPTATION:
+The user identifies their struggle/context as: "$disabilityType".
+The user's specific executive dysfunction is: "$executiveStruggle".
+
+INSTRUCTIONS:
+1. Analyze the condition "$disabilityType".
+2. Adapt your coaching style to match the psychological needs of this condition.
+   - IF "$disabilityType" involves FATIGUE (e.g., Chronic Pain, Depression): Prioritize "Low Energy" strategies. Suggest sitting down while working.
+   - IF "$disabilityType" involves OBSESSION/PERFECTIONISM (e.g., OCD): Focus on "Good Enough" standards. Discourage re-checking.
+   - IF "$disabilityType" is SITUATIONAL (e.g., "Busy Student"): Focus on speed, efficiency, and deadlines.
+   - IF "$disabilityType" involves MEMORY (e.g., Brain Fog): Focus on external reminders and visual cues.
+
+3. Adapt to "$executiveStruggle":
+   - If "Task Paralysis": The first step must be a trivial "Bridge Action" (e.g., "Put on socks").
+   - If "Time Blindness": Emphasize timers and alarms.
+   - If "Overwhelm": Limit the plan to just 3 steps max.
+""");
+
+    //     if (disabilityType.contains("ADHD")) {
+    //       buffer.writeln("""
+    // ADHD SUPPORT:
+    // - Every step MUST include estimated_seconds.
+    // - One action per sentence.
+    // """);
+    //     }
+
+    //     if (disabilityType.contains("Autism")) {
+    //       buffer.writeln("""
+    // AUTISM SUPPORT:
+    // - Be literal.
+    // - Warn if sensory triggers: $sensoryTriggers.
+    // """);
+    //     }
+
+    //     if (executiveStruggle == "Task Paralysis") {
+    //       buffer.writeln("""
+    // ACTIVATION RULE:
+    // First step must NOT be the main task.
+    // """);
+    //     }
 
     // ==========================
     // OUTPUT FORMAT
@@ -111,7 +180,7 @@ First step must NOT be the main task.
     buffer.writeln("""
 CRITICAL OUTPUT RULES:
 - OUTPUT VALID JSON ONLY.
-- NO conversational filler (e.g., "Here is your plan").
+- NO Markdown blocks. NO conversational filler (e.g., "Here is your plan").
 - START and END with curly braces { }.
 
 If confident:
