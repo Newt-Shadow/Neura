@@ -44,16 +44,16 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
     );
     final exists = await downloader.checkModelExistence();
 
-    if (!exists) {
-      setState(() => _loadingStatus = "Waking up AI Brain...");
-      try {
-        final path = await downloader.getFilePath();
-        await ModelHolder.loadModel(path);
-        if (mounted) setState(() => _loadingStatus = "");
-      } catch (e) {
-        if (mounted) setState(() => _loadingStatus = "Error: $e");
-      }
-    }
+    // if (!exists) {
+    //   setState(() => _loadingStatus = "Waking up AI Brain...");
+    //   try {
+    //     final path = await downloader.getFilePath();
+    //     await ModelHolder.loadModel(path);
+    //     if (mounted) setState(() => _loadingStatus = "");
+    //   } catch (e) {
+    //     if (mounted) setState(() => _loadingStatus = "Error: $e");
+    //   }
+    // }
   }
 
   @override
