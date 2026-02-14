@@ -51,26 +51,26 @@ void main() async {
     print("🌍 Web/Windows detected. Skipping Local Model Setup.");
     initialScreen = const SmartDashboardScreen();
   } else {
-    // EXISTING LOGIC FOR MOBILE
-    final downloader = GemmaDownloaderDataSource(model: kGemmaModelConfig);
-    final bool isModelPresent = await downloader.checkModelExistence();
+    // 🔥 Only check model if Local LLM is enabled
+    if (neuroSettings.useLocalModel) {
+      final downloader = GemmaDownloaderDataSource(model: kGemmaModelConfig);
+      final bool isModelPresent = await downloader.checkModelExistence();
 
-    if (isModelPresent) {
-      print("✅ Model found. Loading into memory...");
-      try {
-        final path = await downloader.getFilePath();
-        await ModelHolder.loadModel(path);
-        initialScreen = const SmartDashboardScreen();
-      } catch (e) {
-        print("❌ Failed to load model: $e");
-        // If corrupt, go to setup
-        initialScreen = const SmartDashboardScreen();
+      if (isModelPresent) {
+        print("✅ Model found. Loading into memory...");
+        try {
+          final path = await downloader.getFilePath();
+          await ModelHolder.loadModel(path);
+        } catch (e) {
+          print("❌ Failed to load model: $e");
+        }
       }
-    } else {
-      print("⚠️ Model missing. Redirecting to setup.");
-      initialScreen = const ModelSetupScreen();
     }
+
+    // ALWAYS start at Dashboard
+    initialScreen = const SmartDashboardScreen();
   }
+
   // final downloader = GemmaDownloaderDataSource(model: kGemmaModelConfig);
   // final bool isModelPresent = await downloader.checkModelExistence();
 

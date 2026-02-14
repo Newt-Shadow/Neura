@@ -72,9 +72,10 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
     final isGuest = settings.currentUser == null;
     final String? authorizedEmail = dotenv.env['ADMIN_EMAIL'];
     final String? currentEmail = settings.currentUser?.email;
-    final bool isAdmin = (currentEmail != null && 
-                          authorizedEmail != null && 
-                          currentEmail.trim() == authorizedEmail.trim());
+    final bool isAdmin =
+        (currentEmail != null &&
+        authorizedEmail != null &&
+        currentEmail.trim() == authorizedEmail.trim());
 
     // We define the screens here to access 'settings' and 'context'
     final List<Widget> screens = [
@@ -117,14 +118,14 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
             ),
           ),
           // In your AppBar actions:
-        if (isAdmin)
+          if (isAdmin)
             IconButton(
               icon: const Icon(Icons.terminal, color: Colors.grey),
               tooltip: "System Logs (Admin)",
               onPressed: () {
                 Navigator.push(
-                  context, 
-                  MaterialPageRoute(builder: (_) => const DebugLogScreen())
+                  context,
+                  MaterialPageRoute(builder: (_) => const DebugLogScreen()),
                 );
               },
             ),
@@ -293,14 +294,22 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
               color: Colors.teal.shade50,
               iconColor: Colors.teal,
               onTap: () {
-                if (!ModelHolder.isModelLoaded && _loadingStatus.isEmpty) {
+                final useLocal = settings.useLocalModel;
+                if (!useLocal) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const TaskBreakdownScreen(),
+                    ),
+                  );
+                  return;
+                }
+
+                // 🧠 If using Local LLM mode
+                if (!ModelHolder.isModelLoaded) {
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const ModelSetupScreen()),
-                  );
-                } else if (!ModelHolder.isModelLoaded) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Brain is waking up...")),
                   );
                 } else {
                   Navigator.push(

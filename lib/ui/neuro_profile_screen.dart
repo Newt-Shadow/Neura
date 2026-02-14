@@ -24,6 +24,8 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
   final FocusNode _sensoryFocus = FocusNode();
   final FocusNode _interestFocus = FocusNode();
 
+  bool _userIsTyping = false;
+
   @override
   void initState() {
     super.initState();
@@ -33,17 +35,51 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
     _sensoryCtrl = TextEditingController(text: settings.sensoryTriggers);
     _interestCtrl = TextEditingController(text: settings.interest);
 
+    void setTyping() => _userIsTyping = true;
+    void clearTyping() => _userIsTyping = false;
+
+    // Track typing to prevent overwriting user input
+    _nameCtrl.addListener(setTyping);
+    _diagnosisCtrl.addListener(setTyping);
+    _sensoryCtrl.addListener(setTyping);
+    _interestCtrl.addListener(setTyping);
+
     // Attach Listeners: Save immediately when user leaves a text box
-    _nameFocus.addListener(() => _onFocusLost(_nameFocus));
-    _diagnosisFocus.addListener(() => _onFocusLost(_diagnosisFocus));
-    _sensoryFocus.addListener(() => _onFocusLost(_sensoryFocus));
-    _interestFocus.addListener(() => _onFocusLost(_interestFocus));
+    _nameFocus.addListener(() { if (!_nameFocus.hasFocus) { clearTyping(); _onFocusLost(_nameFocus); }});
+    _diagnosisFocus.addListener(() { if (!_diagnosisFocus.hasFocus) { clearTyping(); _onFocusLost(_diagnosisFocus); }});
+    _sensoryFocus.addListener(() { if (!_sensoryFocus.hasFocus) { clearTyping(); _onFocusLost(_sensoryFocus); }});
+    _interestFocus.addListener(() { if (!_interestFocus.hasFocus) { clearTyping(); _onFocusLost(_interestFocus); }});
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final settings = context.watch<NeuroSettings>();
+
+    // 🔥 RACE CONDITION FIX: 
+    // If Cloud Data arrives late (e.g., after reinstall), update the text fields
+    // UNLESS the user is currently typing.
+    if (!_userIsTyping) {
+      if (_nameCtrl.text == "Friend" && settings.userName != "Friend") {
+        _nameCtrl.text = settings.userName;
+      }
+      if (_diagnosisCtrl.text == "ADHD" && settings.disabilityType != "ADHD") {
+        _diagnosisCtrl.text = settings.disabilityType;
+      }
+      if (_sensoryCtrl.text != settings.sensoryTriggers) {
+         _sensoryCtrl.text = settings.sensoryTriggers;
+      }
+      if (_interestCtrl.text != settings.interest) {
+         _interestCtrl.text = settings.interest;
+      }
+    }
   }
 
   @override
   void dispose() {
-    // Final Save check when screen is destroyed
-    _performSave(silent: true);
+    // ⚠️ CRITICAL FIX: DO NOT call _performSave() here.
+    // Saving in dispose causes the "deactivated widget" crash.
+    // PopScope handles the save on exit.
 
     _nameCtrl.dispose();
     _diagnosisCtrl.dispose();
@@ -66,8 +102,10 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
   }
 
   void _performSave({bool silent = false}) {
-    // Basic validation check (skip saving empty name if user cleared it by mistake)
+    // Basic validation check
     if (_nameCtrl.text.trim().isEmpty) return;
+
+    if (!mounted) return; // Safety check
 
     context.read<NeuroSettings>().saveProfile(
       name: _nameCtrl.text,
@@ -77,7 +115,7 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
       interest: _interestCtrl.text,
     );
 
-    if (!silent) {
+    if (!silent && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Profile Saved & Encrypted 🔒")),
       );
@@ -90,13 +128,15 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
   Widget build(BuildContext context) {
     final settings = context.watch<NeuroSettings>();
 
-    // PopScope ensures data is saved even if user hits "Back" without clicking anything
+    // PopScope ensures data is saved when user hits "Back"
+    // This runs BEFORE dispose, making it safe.
     return PopScope(
       canPop: true,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         if (didPop) _performSave(silent: true);
       },
       child: Scaffold(
+        appBar: AppBar(title: const Text("Profile Settings")),
         body: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(20),
@@ -110,7 +150,6 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
                   const SizedBox(height: 20),
 
                   // --- 1. PERSONAL DETAILS ---
-                  // ✅ Fix: Pass FocusNode as 4th positional argument
                   _buildTextField("Name", _nameCtrl, Icons.person, _nameFocus),
                   
                   const SizedBox(height: 15),
@@ -174,11 +213,10 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
     );
   }
 
-  // ✅ Definition: FocusNode is the 4th POSITIONAL argument
   Widget _buildTextField(String label, TextEditingController controller, IconData icon, FocusNode focusNode, {String? hint}) {
     return TextFormField(
       controller: controller,
-      focusNode: focusNode, // ✅ Connects the detector
+      focusNode: focusNode, 
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
@@ -186,7 +224,6 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         filled: true,
         fillColor: Colors.grey.shade50,
-        
       ),
     );
   }

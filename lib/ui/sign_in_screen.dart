@@ -1,41 +1,71 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../logic/neuro_settings.dart';
-import 'profile_setup_screen.dart'; // We will create this next
+import 'profile_setup_screen.dart';
+import 'smart_dashboard_screen.dart';
 
 class SignInScreen extends StatelessWidget {
   const SignInScreen({super.key});
 
   Future<void> _handleGoogleSignIn(BuildContext context) async {
     final settings = context.read<NeuroSettings>();
-    
-    // Call the Google Sign In logic
+
+    // 1. Call Auth + Wait for Cloud Pull (Handled by NeuroSettings)
     final user = await settings.signInWithGoogle();
-    
-    if (user != null && context.mounted) {
-      // Check if profile is empty (New User?)
-      if (settings.userName == "Friend" || settings.userName.isEmpty) {
-        // Go to Profile Setup
-        Navigator.pushReplacement(
-          context, 
-          MaterialPageRoute(builder: (_) => const ProfileSetupScreen())
-        );
-      } else {
-        // Existing user, go back or show success
-        Navigator.pop(context);
+
+    if (!context.mounted) return;
+
+    if (user != null) {
+      // 2. Double-check: Is this a Brand New User?
+      // (Even though NeuroSettings synced, we check if the profile field exists to decide navigation)
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      bool isNewUser = true; // Default to new
+      if (doc.exists && doc.data() != null) {
+         final data = doc.data()!;
+         // If we have an encrypted profile string, they are an Existing User
+         if (data['encrypted_profile'] != null && data['encrypted_profile'] != "") {
+           isNewUser = false;
+         }
+      }
+
+      if (context.mounted) {
+        if (isNewUser) {
+          // 🚀 Case A: New User -> Go to Profile Setup
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const ProfileSetupScreen()),
+          );
+        } else {
+          // 🏠 Case B: Existing User -> Go to Dashboard (Fresh Reload)
+          // We use pushReplacement to reset the Dashboard state so it greets the user correctly.
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const SmartDashboardScreen()),
+          );
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Sync Complete. Welcome back!")),
+          );
+        }
+      }
+    } else {
+      // ❌ Login Cancelled or Failed
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Welcome back!")),
+          const SnackBar(content: Text("Sign In Failed or Cancelled")),
         );
       }
-    } else if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Sign In Failed or Cancelled")),
-      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Watch settings to trigger rebuild when isLoading changes (shows spinner)
     final settings = context.watch<NeuroSettings>();
 
     return Scaffold(
@@ -45,6 +75,9 @@ class SignInScreen extends StatelessWidget {
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.pop(context),
         ),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
       ),
       body: Padding(
         padding: const EdgeInsets.all(32.0),
@@ -64,9 +97,15 @@ class SignInScreen extends StatelessWidget {
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
             const Spacer(),
-            
+
             if (settings.isLoading)
-              const CircularProgressIndicator()
+              const Column(
+                children: [
+                  CircularProgressIndicator(color: Colors.teal),
+                  SizedBox(height: 16),
+                  Text("Syncing Cloud Data...", style: TextStyle(color: Colors.grey)),
+                ],
+              )
             else
               SizedBox(
                 width: double.infinity,
@@ -78,16 +117,21 @@ class SignInScreen extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.black,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                 ),
               ),
-              
+
             const SizedBox(height: 16),
             if (!settings.isLoading)
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text("Continue as Guest", style: TextStyle(color: Colors.grey)),
+                child: const Text(
+                  "Continue as Guest",
+                  style: TextStyle(color: Colors.grey),
+                ),
               ),
             const SizedBox(height: 30),
           ],

@@ -34,5 +34,51 @@
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
+  <script>
+  async function checkDockerEnvironment() {
+    try {
+      const response = await fetch("/", { method: "HEAD" });
+      const isDocker = response.headers.get("X-Docker-Environment");
+
+      if (isDocker === "true") {
+        showDownloadButton();
+      }
+    } catch (e) {
+      console.log("Environment check failed.");
+    }
+  }
+
+  function showDownloadButton() {
+    const buttonContainer = document.createElement("div");
+    buttonContainer.style.position = "fixed";
+    buttonContainer.style.bottom = "20px";
+    buttonContainer.style.right = "20px";
+    buttonContainer.style.zIndex = "9999";
+
+    buttonContainer.innerHTML = `
+      <a href="/neura.apk" download>
+        <button style="
+          background: linear-gradient(135deg, #00c6ff, #0072ff);
+          border: none;
+          color: white;
+          padding: 14px 22px;
+          font-size: 16px;
+          font-weight: bold;
+          border-radius: 30px;
+          cursor: pointer;
+          box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+          transition: all 0.2s ease-in-out;
+        ">
+          📱 Download Android App
+        </button>
+      </a>
+    `;
+
+    document.body.appendChild(buttonContainer);
+  }
+
+  window.addEventListener("load", checkDockerEnvironment);
+</script>
+
 </body>
 </html>
