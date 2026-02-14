@@ -8,6 +8,7 @@ import '../domain/ai_response.dart';
 import 'neuro_settings.dart';
 import 'pii_masker.dart';
 import 'prompt_builder.dart';
+import 'advanced_logger.dart';
 
 class RemoteAIService {
   static Future<AIResponse> processRequest({
@@ -65,7 +66,22 @@ class RemoteAIService {
         ])
       ];
 
+      AdvancedLogger().logApi(
+        method: "POST", 
+        url: "gemini-2.5-flash:generateContent", // Just a label
+        body: {
+            "query": safeQuery,
+            "hasImage": hasImage,
+            "systemPrompt": systemPrompt, // Useful to see what context was sent
+        }
+      );
+
       final response = await model.generateContent(content);
+      AdvancedLogger().logApi(
+        method: "RESPONSE", 
+        url: "200 OK",
+        response: response.text ?? "NULL RESPONSE"
+      );
 
       print("🔍 RAW AI RESPONSE: ${response.text}");
 
@@ -92,9 +108,17 @@ class RemoteAIService {
       }
 
       final decoded = json.decode(cleanText);
+      // 3. LOG PARSED JSON (Optional, but good for verification)
+      AdvancedLogger().log(
+        LogType.info, 
+        "Parsed JSON", 
+        "Successfully decoded AI response",
+        jsonContent: decoded
+      );
       return AIResponse.fromJson(decoded);
 
     } catch (e) {
+      AdvancedLogger().log(LogType.error, "AI Error", e.toString());
       return _errorResponse("Scene unclear. Please describe your goal.");
     }
   }

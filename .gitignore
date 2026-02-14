@@ -13,6 +13,7 @@ dist/
 .vite/
 lib/firebase_options.dart
 
+
 # Firebase
 android/app/google-services.json
 ios/Runner/GoogleService-Info.plist

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_gemma/flutter_gemma.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'panic_mode_screen.dart';
 import 'body_double_screen.dart';
 import '../logic/neuro_settings.dart';
@@ -13,6 +14,7 @@ import 'task_breakdown_screen.dart';
 import 'sign_in_screen.dart';
 import 'model_setup_screen.dart';
 import 'translator_screen.dart';
+import 'debug_log_screen.dart';
 
 class SmartDashboardScreen extends StatefulWidget {
   const SmartDashboardScreen({super.key});
@@ -26,7 +28,7 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
   final String _modelUrl =
       'https://huggingface.co/google/gemma-3n-E2B-it-litert-preview/resolve/main/gemma-3n-E2B-it-int4.task';
   final String _filename = 'gemma-3n-E2B-it-int4.task';
-  
+
   int _selectedIndex = 0;
 
   @override
@@ -39,10 +41,10 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
 
   Future<void> _autoLoadModel() async {
     final settings = context.read<NeuroSettings>();
-    
+
     // 🛑 STOP: If user didn't enable Local LLM, do nothing.
     if (!settings.useLocalModel) {
-      return; 
+      return;
     }
 
     if (ModelHolder.isModelLoaded) return;
@@ -68,12 +70,17 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
   Widget build(BuildContext context) {
     final settings = context.watch<NeuroSettings>();
     final isGuest = settings.currentUser == null;
+    final String? authorizedEmail = dotenv.env['ADMIN_EMAIL'];
+    final String? currentEmail = settings.currentUser?.email;
+    final bool isAdmin = (currentEmail != null && 
+                          authorizedEmail != null && 
+                          currentEmail.trim() == authorizedEmail.trim());
 
     // We define the screens here to access 'settings' and 'context'
     final List<Widget> screens = [
       _buildDashboardBody(settings), // Index 0: Dashboard (Home)
-      const TranslatorScreen(),      // Index 1: Translator
-      const NeuroProfileScreen(),    // Index 2: Profile
+      // const TranslatorScreen(), // Index 1: Translator
+      const NeuroProfileScreen(), // Index 2: Profile
     ];
 
     return Scaffold(
@@ -93,25 +100,48 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.local_fire_department, color: Colors.orange, size: 20),
+                const Icon(
+                  Icons.local_fire_department,
+                  color: Colors.orange,
+                  size: 20,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   "${settings.streakCount}",
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange,
+                  ),
                 ),
               ],
             ),
           ),
+          // In your AppBar actions:
+        if (isAdmin)
+            IconButton(
+              icon: const Icon(Icons.terminal, color: Colors.grey),
+              tooltip: "System Logs (Admin)",
+              onPressed: () {
+                Navigator.push(
+                  context, 
+                  MaterialPageRoute(builder: (_) => const DebugLogScreen())
+                );
+              },
+            ),
           // 🚨 PANIC BUTTON
           IconButton(
-            icon: const Icon(Icons.volunteer_activism, color: Colors.pinkAccent),
+            icon: const Icon(
+              Icons.volunteer_activism,
+              color: Colors.pinkAccent,
+            ),
             tooltip: "Sensory Rescue",
             onPressed: () {
               Navigator.push(
                 context,
                 PageRouteBuilder(
                   pageBuilder: (_, __, ___) => const PanicModeScreen(),
-                  transitionsBuilder: (_, a, __, c) => FadeTransition(opacity: a, child: c),
+                  transitionsBuilder: (_, a, __, c) =>
+                      FadeTransition(opacity: a, child: c),
                 ),
               );
             },
@@ -130,7 +160,10 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
                 icon: const Icon(Icons.login, color: Colors.teal),
                 label: const Text(
                   "Sign In",
-                  style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: Colors.teal,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             )
@@ -138,16 +171,16 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
             PopupMenuButton<String>(
               icon: CircleAvatar(
                 backgroundColor: Colors.teal,
-                backgroundImage: settings.currentUser?.photoURL != null 
-                    ? NetworkImage(settings.currentUser!.photoURL!) 
+                backgroundImage: settings.currentUser?.photoURL != null
+                    ? NetworkImage(settings.currentUser!.photoURL!)
                     : null,
-                child: settings.currentUser?.photoURL == null 
-                    ? const Icon(Icons.person, color: Colors.white) 
+                child: settings.currentUser?.photoURL == null
+                    ? const Icon(Icons.person, color: Colors.white)
                     : null,
               ),
               onSelected: (val) {
                 if (val == 'profile') {
-                  setState(() => _selectedIndex = 2); // Go to Profile Tab
+                  setState(() => _selectedIndex = 1); // Go to Profile Tab
                 } else if (val == 'logout') {
                   settings.signOut();
                 }
@@ -155,40 +188,53 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
               itemBuilder: (ctx) => [
                 PopupMenuItem(
                   value: 'profile',
-                  child: Text("Logged in as ${settings.currentUser?.displayName ?? 'User'}"),
+                  child: Text(
+                    "Logged in as ${settings.currentUser?.displayName ?? 'User'}",
+                  ),
                 ),
                 const PopupMenuItem(
                   value: 'profile',
-                  child: Row(children: [Icon(Icons.person), SizedBox(width: 8), Text("My Profile")]),
+                  child: Row(
+                    children: [
+                      Icon(Icons.person),
+                      SizedBox(width: 8),
+                      Text("My Profile"),
+                    ],
+                  ),
                 ),
                 const PopupMenuItem(
                   value: 'logout',
-                  child: Row(children: [Icon(Icons.logout, color: Colors.red), SizedBox(width: 8), Text("Sign Out", style: TextStyle(color: Colors.red))]),
+                  child: Row(
+                    children: [
+                      Icon(Icons.logout, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text("Sign Out", style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
                 ),
               ],
             ),
         ],
       ),
-      
+
       // FIX: Single Body that switches based on index
       body: screens[_selectedIndex],
-      
+
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (i) => setState(() => _selectedIndex = i),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.dashboard_customize_outlined), // Changed icon to represent Dashboard
+            icon: Icon(
+              Icons.dashboard_customize_outlined,
+            ), // Changed icon to represent Dashboard
             label: "Home",
           ),
           // NavigationDestination(
           //   icon: Icon(Icons.translate),
           //   label: "Translator",
           // ),
-          NavigationDestination(
-            icon: Icon(Icons.person),
-            label: "Profile",
-          ),
+          NavigationDestination(icon: Icon(Icons.person), label: "Profile"),
         ],
       ),
     );
@@ -213,9 +259,16 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
                     const SizedBox(width: 12),
-                    Text(_loadingStatus, style: TextStyle(color: Colors.teal.shade800)),
+                    Text(
+                      _loadingStatus,
+                      style: TextStyle(color: Colors.teal.shade800),
+                    ),
                   ],
                 ),
               ).animate().fadeIn(),
@@ -241,11 +294,21 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
               iconColor: Colors.teal,
               onTap: () {
                 if (!ModelHolder.isModelLoaded && _loadingStatus.isEmpty) {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ModelSetupScreen()));
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ModelSetupScreen()),
+                  );
                 } else if (!ModelHolder.isModelLoaded) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Brain is waking up...")));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Brain is waking up...")),
+                  );
                 } else {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const TaskBreakdownScreen()));
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const TaskBreakdownScreen(),
+                    ),
+                  );
                 }
               },
             ),
@@ -269,11 +332,16 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
 
             _HeroCard(
               title: "AI Brain Manager",
-              subtitle: ModelHolder.isModelLoaded ? "✅ Active" : "⚙️ Manage Models",
+              subtitle: ModelHolder.isModelLoaded
+                  ? "   Active"
+                  : "⚙️ Manage Models",
               icon: Icons.memory,
               color: Colors.blue.shade50,
               iconColor: Colors.blue,
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ModelSetupScreen())),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ModelSetupScreen()),
+              ),
             ),
           ],
         ),
@@ -330,7 +398,13 @@ class _HeroCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       Text(subtitle, style: const TextStyle(fontSize: 15)),
                     ],
                   ),

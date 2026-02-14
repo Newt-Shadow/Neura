@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
+import '../logic/advanced_logger.dart'; 
 
 import '../logic/remote_ai_service.dart';
 import '../logic/neuro_settings.dart';
@@ -140,6 +141,18 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
         text.toLowerCase().contains("stuck")) {
       _isOverwhelmed = true;
     }
+
+    AdvancedLogger().log(
+      LogType.user, 
+      "User Input", 
+      text.isEmpty ? "[Image Only]" : text, 
+      jsonContent: {
+        "hasImage": _pendingImageBytes != null,
+        "isVoice": _isListening, // or check if speech was used
+        "isOverwhelmed": _isOverwhelmed,
+        "energyLevel": _currentEnergy
+      }
+    );
 
     _processTaskRequest(
       textInput: text,
