@@ -1,4 +1,4 @@
-# Neura: The Neurodivergent-First AI Assistant 🧠✨
+# Neura: The Neurodivergent-First AI Assistant 
 
 > **Empowering minds with ADHD, Autism, Dyslexia, and Anxiety through Offline AI and Executive Function Prosthetics.**
 
@@ -10,12 +10,12 @@
 ---
 
 ## 📖 Table of Contents
-- [Neura: The Neurodivergent-First AI Assistant 🧠✨](#neura-the-neurodivergent-first-ai-assistant-)
+- [Neura: The Neurodivergent-First AI Assistant](#neura-the-neurodivergent-first-ai-assistant)
   - [📖 Table of Contents](#-table-of-contents)
   - [💡 About The Project](#-about-the-project)
   - [🌟 Key Features](#-key-features)
     - [1. 🤖 Hybrid AI Engine (Cloud + Edge)](#1--hybrid-ai-engine-cloud--edge)
-    - [2. 👁️ Visual Deconstruction](#2-️-visual-deconstruction)
+    - [2. 👁️ Visual \& Voice Deconstruction](#2-️-visual--voice-deconstruction)
     - [3. 🧬 Dynamic Neuro-Adaptation](#3--dynamic-neuro-adaptation)
     - [4. 🔒 Zero-Knowledge Privacy](#4--zero-knowledge-privacy)
   - [🛠 Technical Architecture](#-technical-architecture)
@@ -52,13 +52,13 @@ Neura bridges this gap using a **Hybrid AI Approach**:
 * **Cloud Mode:** Uses Google Gemini Pro for complex reasoning and high-speed planning.
 * **Offline Mode (Beta):** Runs a quantized **Gemma 2B** model locally on the device's NPU/GPU. No internet required.
 
-### 2. 👁️ Visual Deconstruction
-* Don't know where to start? Just take a picture.
-* Neura sees "a pile of laundry" and converts it into: *"Step 1: Find all the socks."*
+### 2. 👁️ Visual & Voice Deconstruction
+* **See It:** Don't know where to start? Just take a picture. Neura sees "a pile of laundry" and converts it into: *"Step 1: Find all the socks."*
+* **Say It:** Overwhelmed? Just speak your mind. The AI listens and organizes your verbal brain dump into a clear checklist.
 
 ### 3. 🧬 Dynamic Neuro-Adaptation
 The AI creates a psychological profile based on the user's diagnosis:
-* **ADHD:** Steps are gamified quests with time estimates.
+* **ADHD:** Steps are gamified quests with time estimates and dopamine rewards (streaks).
 * **Autism:** Instructions are literal, logical, and sensory-aware.
 * **Dyslexia:** Text is formatted with bullet points, high-contrast fonts (OpenDyslexic), and emojis.
 * **Anxiety:** Tone is grounding, reassuring, and focuses on "Micro-Wins."
@@ -126,7 +126,7 @@ Follow these steps to run the source code on your local machine.
 
 ## 🐳 Running with Docker
 
-If you want to build the web version or run a clean containerized environment for development.
+We provide a Docker container for the **Web Version** of Neura.
 
 1.  **Build the Image**
     ```bash
@@ -140,34 +140,37 @@ If you want to build the web version or run a clean containerized environment fo
 
 3.  **Access App**
     Open `http://localhost:8080` in your browser.
-    *(Note: Offline LLM features are disabled in the web/docker version due to browser limitations).*
+    *(Note: Offline LLM features are disabled in the web/docker version due to browser limitations. It will default to Cloud Mode).*
 
 ---
 
 ## 📱 Installing on Mobile
 
+To judge the full experience, installing on a physical device is recommended.
+
 ### Android (APK)
-1.  Navigate to the `build/app/outputs/flutter-apk/` directory after running:
+1.  Navigate to the build directory after running the release command:
     ```bash
     flutter build apk --release
     ```
-2.  Transfer `app-release.apk` to your phone.
-3.  Tap to install (Enable "Install from Unknown Sources" in settings).
+2.  Locate the file at: `build/app/outputs/flutter-apk/app-release.apk`
+3.  Transfer `app-release.apk` to your phone via USB or Google Drive.
+4.  Tap to install (Enable "Install from Unknown Sources" in settings if prompted).
 
 ### iOS (IPA)
 1.  Open `ios/Runner.xcworkspace` in Xcode.
-2.  Select your Development Team in Signing & Capabilities.
-3.  Connect your iPhone.
-4.  Product -> Archive (or run directly via Play button).
+2.  Select your Development Team in **Signing & Capabilities**.
+3.  Connect your iPhone via USB.
+4.  Select your device as the target and click the **Play** (Run) button.
 
 ---
 
 ## 🎮 How to Use
 
-1.  **Onboarding:** Create a profile. Be honest about your neuro-type (e.g., "ADHD", "Anxiety"). This tunes the AI.
+1.  **Onboarding:** Create a profile. Be honest about your neuro-type (e.g., "ADHD", "Anxiety"). This tunes the AI's personality.
 2.  **The Dashboard:**
-    * **Task Assistant:** Tap the camera icon. Take a photo of a messy desk. The AI will break it down.
-    * **Translator:** Use the AR translator for confusing documents.
+    * **Task Assistant:** Tap the camera icon to snap a photo of a messy area, or type/speak your goal. The AI will break it down into micro-steps.
+    * **Secure History:** Review past plans and chats in the encrypted vault.
     * **Profile:** Toggle "Dyslexia Font" or "Offline Mode" here.
 3.  **Offline Mode:** Go to Profile -> Toggle "Use Offline AI". Wait for the model (1.5GB) to download. Once done, you can turn off Wi-Fi and still get planning help!
 

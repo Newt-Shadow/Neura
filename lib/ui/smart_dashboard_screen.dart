@@ -43,7 +43,7 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
     if (!settings.useLocalModel) {
       return; 
     }
-    
+
     if (ModelHolder.isModelLoaded) return;
 
     final downloader = GemmaDownloaderDataSource(
@@ -166,10 +166,10 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
             icon: Icon(Icons.dashboard_customize_outlined), // Changed icon to represent Dashboard
             label: "Home",
           ),
-          NavigationDestination(
-            icon: Icon(Icons.translate),
-            label: "Translator",
-          ),
+          // NavigationDestination(
+          //   icon: Icon(Icons.translate),
+          //   label: "Translator",
+          // ),
           NavigationDestination(
             icon: Icon(Icons.person),
             label: "Profile",
