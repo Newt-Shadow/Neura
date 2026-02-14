@@ -35,6 +35,8 @@ class NeuroSettings extends ChangeNotifier {
 
   bool _isLoading = false;
 
+  bool _useLocalModel = false;
+
   // ============================================================
   // 📦 GETTERS
   // ============================================================
@@ -52,19 +54,21 @@ class NeuroSettings extends ChangeNotifier {
   String get interest => _profile['interest'] ?? "Focus";
   String get preferredLanguage =>
       _profile['language'] ?? "English";
+  
 
   bool get dyslexiaMode => _profile['font'] == 'dyslexic';
   bool get useDyslexicFont => dyslexiaMode;
   bool get highContrast => _profile['contrast'] == 'high';
 
   String? get fontFamily =>
-      dyslexiaMode ? 'OpenDyslexic' : null;
+      dyslexiaMode ? 'OpenDyslexic' : 'Lexend';
 
   double get energyLevel => _energyLevel;
   bool get isOverwhelmed => _isOverwhelmed;
 
   String get diagnosis => disabilityType;
   String get sensorySensitivities => sensoryTriggers;
+  bool get useLocalModel => _useLocalModel;
 
   List<Map<String, String>> get history => _history;
 
@@ -103,6 +107,15 @@ class NeuroSettings extends ChangeNotifier {
     }
 
     // Load history
+    
+
+    _useLocalModel = prefs.getBool('use_local_model') ?? false;
+    _streakCount = prefs.getInt('streak') ?? 0;
+    _energyLevel =
+        prefs.getDouble('energy_level') ?? 0.5;
+    _isOverwhelmed =
+        prefs.getBool('is_overwhelmed') ?? false;
+
     final historyJson =
         prefs.getString('local_history');
     if (historyJson != null) {
@@ -110,12 +123,6 @@ class NeuroSettings extends ChangeNotifier {
       _history =
           raw.map((e) => Map<String, String>.from(e)).toList();
     }
-
-    _streakCount = prefs.getInt('streak') ?? 0;
-    _energyLevel =
-        prefs.getDouble('energy_level') ?? 0.5;
-    _isOverwhelmed =
-        prefs.getBool('is_overwhelmed') ?? false;
 
     // Auto sync on login
     FirebaseAuth.instance
@@ -160,6 +167,14 @@ class NeuroSettings extends ChangeNotifier {
     notifyListeners();
   }
 
+  // 🆕 Toggle Local LLM
+  void toggleLocalModel(bool value) async {
+    _useLocalModel = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('use_local_model', value);
+    notifyListeners();
+  }
+
   // ============================================================
   // 👤 PROFILE
   // ============================================================
@@ -169,21 +184,29 @@ class NeuroSettings extends ChangeNotifier {
     required String diagnosis,
     required String sensory,
     required String language,
+    String? struggle,
+    String? interest,
   }) {
-    updateProfile({
+    final newMap = {
+      ..._profile,
       'name': name,
       'diagnosis': diagnosis,
       'sensory': sensory,
       'language': language,
-    });
+      if (struggle != null) 'struggle': struggle,
+      if (interest != null) 'interest': interest,
+    };
+    
+    updateProfile(newMap);
   }
 
   void updateProfile(
       Map<String, String> updates) {
     _profile.addAll(updates);
+    notifyListeners();
     _saveToLocal();
     _saveToCloud();
-    notifyListeners();
+    
   }
 
   void toggleFont() {
@@ -256,24 +279,21 @@ class NeuroSettings extends ChangeNotifier {
 
       if (doc.exists && doc.data() != null) {
         final data = doc.data()!;
-
-        if (data.containsKey('encrypted_profile')) {
-          _profile =
-              _decryptMap(data['encrypted_profile']);
+if (_profile.isEmpty) {
+             if (data.containsKey('encrypted_profile')) {
+                _profile = _decryptMap(data['encrypted_profile']);
+                print("☁️ Downloaded Profile from Cloud");
+             }
+             if (data.containsKey('streak')) {
+                _streakCount = data['streak'];
+             }
+             _saveToLocal(); // Update local cache
+             notifyListeners();
+        } else {
+          // Local has data -> Push to Cloud (Trust Local)
+          print("☁️ Local data found. Syncing UP to Cloud.");
+          _saveToCloud();
         }
-
-        if (data.containsKey('encrypted_history')) {
-          _history =
-              _decryptList(data['encrypted_history'])
-                  .cast<Map<String, String>>();
-        }
-
-        if (data.containsKey('streak')) {
-          _streakCount = data['streak'];
-        }
-
-        _saveToLocal();
-        notifyListeners();
       }
     } catch (e) {
       debugPrint("Cloud Sync Error: $e");
@@ -282,31 +302,16 @@ class NeuroSettings extends ChangeNotifier {
 
   Future<void> _saveToCloud() async {
     if (currentUser == null) return;
-
     try {
-      final encrypter =
-          enc.Encrypter(enc.AES(_encKey));
+      final encrypter = enc.Encrypter(enc.AES(_encKey));
+      final encryptedProfile = encrypter.encrypt(json.encode(_profile), iv: _iv).base64;
 
-      final encryptedProfile =
-          encrypter
-              .encrypt(json.encode(_profile), iv: _iv)
-              .base64;
-
-      final encryptedHistory =
-          encrypter
-              .encrypt(json.encode(_history), iv: _iv)
-              .base64;
-
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser!.uid)
-          .set({
+      await FirebaseFirestore.instance.collection('users').doc(currentUser!.uid).set({
         'encrypted_profile': encryptedProfile,
-        'encrypted_history': encryptedHistory,
         'streak': _streakCount,
-        'last_updated':
-            FieldValue.serverTimestamp(),
+        'last_updated': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+      print("☁️ Saved Profile to Cloud");
     } catch (e) {
       debugPrint("Cloud Save Error: $e");
     }
@@ -327,6 +332,7 @@ class NeuroSettings extends ChangeNotifier {
         'local_history', json.encode(_history));
 
     await prefs.setInt('streak', _streakCount);
+    print("💾 Settings Saved Locally: $_profile");  
   }
 
   // ============================================================

@@ -62,6 +62,9 @@ flutter:
     - family: OpenDyslexic
       fonts:
         - asset: assets/OpenDyslexic-Regular.otf
+    - family: Lexend
+      fonts:
+        - asset: assets/Lexend-Regular.ttf
 
   assets:
     - .env

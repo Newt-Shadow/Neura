@@ -4,7 +4,11 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:provider/provider.dart';
 import 'dart:typed_data';
 import 'package:image/image.dart' as img;
-import 'dart:convert'; 
+import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:uuid/uuid.dart';
+
 import '../logic/remote_ai_service.dart';
 import '../logic/neuro_settings.dart';
 import '../logic/model_holder.dart';
@@ -13,6 +17,7 @@ import '../domain/ai_response.dart';
 import 'interactive_task_screen.dart';
 import '../logic/local_llm_service.dart';
 import '../logic/offline_vision_service.dart';
+import '../data/history_repository.dart';
 
 class TaskBreakdownScreen extends StatefulWidget {
   const TaskBreakdownScreen({super.key});
@@ -35,6 +40,19 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
 
   double _currentEnergy = 0.5;
   bool _isOverwhelmed = false;
+
+  Future<String> _getUserId() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) return user.uid;
+
+    const storage = FlutterSecureStorage();
+    String? deviceId = await storage.read(key: 'device_user_id');
+    if (deviceId == null) {
+      deviceId = const Uuid().v4();
+      await storage.write(key: 'device_user_id', value: deviceId);
+    }
+    return deviceId;
+  }
 
   // ==========================================================
   // IMAGE PICK
@@ -111,44 +129,51 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     try {
       final settings = context.read<NeuroSettings>();
       String finalQuery = PIIMasker.mask(textInput ?? "");
+      String visualContext = "";
 
-      String safeQuery = PIIMasker.mask(textInput ?? "");
+      // String safeQuery = PIIMasker.mask(textInput ?? "");
 
       if (imageBytes != null) {
         setState(() => _statusMessage = "Scanning objects (Offline)...");
-        final detectedObjects = await OfflineVisionService.analyzeImage(
-          imageBytes,
-        );
-
-        if (detectedObjects.isNotEmpty) {
-          finalQuery += "\n\n[Context] I see: ${detectedObjects.join(', ')}";
-          print("✅ Vision detected: $detectedObjects");
+        try {
+          final detectedObjects = await OfflineVisionService.analyzeImage(imageBytes);
+          
+          if (detectedObjects.isNotEmpty) {
+            // ✅ Populate visualContext
+            visualContext = detectedObjects.join(', ');
+            
+            finalQuery += "\n\n[Visual Context]: I see $visualContext";
+            print("✅ Vision detected: $visualContext");
+          }
+        } catch (e) {
+          print("Vision Error (Ignored): $e");
         }
-      }
+      } 
 
       AIResponse? aiResponse;
 
-      // if (imageBytes == null) {
-      //   try {
-      //     setState(() => _statusMessage = "Thinking (On-Device)...");
+      final useLocal = context.read<NeuroSettings>().useLocalModel;
 
-      //     // Ask Gemma
-      //     final localText = await LocalLLMService.generateResponse(
-      //       "You are a helpful planner. Output valid JSON for this goal: $finalQuery",
-      //     );
+      // 2. LOCAL LLM (Only if Toggle is ON)
+      if (useLocal && (imageBytes == null || visualContext.isNotEmpty)) {
+        try {
+           setState(() => _statusMessage = "Thinking (Offline)...");
+           
+           final localText = await LocalLLMService.generateResponse(
+             "You are a helpful planner. Output valid JSON for this goal: $finalQuery"
+           );
 
-      //     if (localText != null && localText.contains("{")) {
-      //       // Basic JSON extraction
-      //       final startIndex = localText.indexOf('{');
-      //       final endIndex = localText.lastIndexOf('}');
-      //       final jsonStr = localText.substring(startIndex, endIndex + 1);
-
-      //       aiResponse = AIResponse.fromJson(json.decode(jsonStr));
-      //     }
-      //   } catch (e) {
-      //     print("⚠️ Local Gemma passed. Switching to Cloud.");
-      //   }
-      // }
+           if (localText != null && localText.contains("{")) {
+             final startIndex = localText.indexOf('{');
+             final endIndex = localText.lastIndexOf('}');
+             final jsonStr = localText.substring(startIndex, endIndex + 1);
+             
+             aiResponse = AIResponse.fromJson(json.decode(jsonStr));
+           }
+        } catch (e) {
+           print("⚠️ Local LLM Failed, switching to Cloud: $e");
+        }
+      }
 
       // ------------------------------------------------------------
       // 3. CLOUD FALLBACK
@@ -170,6 +195,9 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
       if (aiResponse!.mode == "clarification") {
         _showClarificationDialog(aiResponse, finalQuery);
       } else if (aiResponse.actions.isNotEmpty) {
+
+        _saveToHistorySafely(finalQuery, aiResponse, imageBytes);
+
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -187,61 +215,76 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     }
   }
 
+  Future<void> _saveToHistorySafely(String query, AIResponse response, Uint8List? imageBytes) async {
+    try {
+       final userId = await _getUserId();
+       HistoryRepository().saveInteraction(
+          userId: userId,
+          userPrompt: query,
+          aiResponse: "Generated ${response.actions.length} steps: ${response.missionName}",
+          imageBytes: imageBytes,
+       );
+    } catch (e) {
+      print("⚠️ History Save Error: $e");
+    }
+  }
+
   // ==========================================================
   // DYNAMIC CLARIFICATION UI (FIXED)
   // ==========================================================
 
   void _showClarificationDialog(AIResponse response, String contextText) {
-    final dynamicOptions = _generateDynamicOptions(
-      response.options,
-      contextText,
-    );
+    final dynamicOptions = _generateDynamicOptions(response.options, contextText);
 
     showModalBottomSheet(
       context: context,
-      builder: (_) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              response.question ?? "What would you like to do?",
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      isScrollControlled: true,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) {
+          return Container(
+            padding: const EdgeInsets.all(20),
+            child: ListView(
+              controller: scrollController,
+              children: [
+                const Icon(Icons.help_outline, size: 40, color: Colors.teal),
+                const SizedBox(height: 10),
+                Text(
+                  response.question ??  "What would you like to do?",
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                ...dynamicOptions.map((option) => ListTile(
+                  title: Text(option),
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (option == "I will type my goal") {
+                      setState(() {
+                        _forceTextMode = true;
+                        _pendingImageBytes = null;
+                        _sessionImageBytes = null;
+                      });
+                      return;
+                    }
+                    String combinedContext = "Context: The AI asked '${response.question}'. User replied: '$option'. Create a plan.";
+                    _processTaskRequest(
+                      textInput: combinedContext,
+                      imageBytes: _sessionImageBytes, 
+                    );
+                  },
+                )).toList(),
+              ],
             ),
-            const SizedBox(height: 20),
-            ...dynamicOptions
-                .map(
-                  (option) => ListTile(
-                    title: Text(option),
-                    onTap: () {
-                      Navigator.pop(context);
-
-                      if (option == "I will type my goal") {
-                        setState(() {
-                          _forceTextMode = true;
-                          _pendingImageBytes = null;
-                          _sessionImageBytes = null;
-                        });
-                        return;
-                      }
-
-                      String combinedContext =
-                          "Context: The AI asked '${response.question}'. User replied: '$option'. Create a plan.";
-
-                      // FIX: Pass _pendingImageBytes so the AI can "see" the scene again
-                      _processTaskRequest(
-                        textInput: option,
-                        imageBytes: _sessionImageBytes,
-                      );
-                    },
-                  ),
-                )
-                .toList(),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
+
 
   // ==========================================================
   // 🔥 SMART OPTION GENERATOR

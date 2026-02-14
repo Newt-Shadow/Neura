@@ -37,6 +37,13 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
   }
 
   Future<void> _autoLoadModel() async {
+    final settings = context.read<NeuroSettings>();
+    
+    // 🛑 STOP: If user didn't enable Local LLM, do nothing.
+    if (!settings.useLocalModel) {
+      return; 
+    }
+    
     if (ModelHolder.isModelLoaded) return;
 
     final downloader = GemmaDownloaderDataSource(
