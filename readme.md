@@ -94,7 +94,7 @@ Follow these steps to run the source code on your local machine.
 
 1.  **Clone the Repository**
     ```bash
-    git clone [https://github.com/your-username/neura.git](https://github.com/your-username/neura.git)
+    git clone [https://github.com/Newt-Shadow/Neura.git](https://github.com/Newt-Shadow/Neura.git)
     cd neura
     ```
 
@@ -120,7 +120,7 @@ Follow these steps to run the source code on your local machine.
     flutter run
     ```
 
-> **Note:** The "Offline AI" feature requires a physical device with decent RAM (min 4GB) and GPU capabilities (Pixel 6+, Samsung S21+, iPhone 12+).
+> **Note:** The "Offline AI" feature requires a physical device with decent RAM (min 8GB) and GPU capabilities (Pixel 6+, Samsung S21+, iPhone 12+).
 
 ---
 
