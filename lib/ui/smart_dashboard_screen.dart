@@ -44,7 +44,7 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
     );
     final exists = await downloader.checkModelExistence();
 
-    if (exists) {
+    if (!exists) {
       setState(() => _loadingStatus = "Waking up AI Brain...");
       try {
         final path = await downloader.getFilePath();
