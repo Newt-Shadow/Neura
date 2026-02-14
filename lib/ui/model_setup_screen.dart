@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:flutter_gemma/flutter_gemma.dart';
-import 'dart:io';
+import 'package:universal_io/io.dart'; // Uses the new package
+import 'package:flutter/foundation.dart'; // For kIsWeb
 import 'dart:math';
 import '../data/downloader_datasource.dart';
 import '../domain/download_model.dart';

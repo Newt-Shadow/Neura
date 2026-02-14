@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'package:universal_io/io.dart'; // Uses the new package
+import 'package:flutter/foundation.dart'; // For kIsWeb
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;

@@ -1,18 +1,24 @@
 import 'package:neuro/logic/model_holder.dart';
 import 'package:flutter_gemma/flutter_gemma.dart'; // Ensure this is imported for Message class
+import 'package:flutter/foundation.dart';
+import 'package:universal_io/io.dart'; 
 
 class LocalLLMService {
   
   /// Generate text using the loaded ModelHolder
   static Future<String?> generateResponse(String prompt) async {
-    // Check if ModelHolder has loaded the model
+    if (kIsWeb || Platform.isWindows) {
+    print("🚫 Local LLM disabled for Web/Windows. Switching to Cloud API.");
+    return null; 
+  }
+    
     if (!ModelHolder.isModelLoaded) {
       print("⚠️ Gemma model not loaded in ModelHolder.");
       return null;
     }
 
     try {
-      // Create chat session if it doesn't exist
+     
       if (ModelHolder.chat == null) {
         ModelHolder.chat = await ModelHolder.createChat();
       }

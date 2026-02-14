@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'package:universal_io/io.dart'; // Uses the new package
+import 'package:flutter/foundation.dart'; // For kIsWeb
 
 import 'package:flutter/foundation.dart';
 import '../logic/model_holder.dart'; // Add this line

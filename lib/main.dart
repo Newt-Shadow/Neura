@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/foundation.dart'; // For kIsWeb
+import 'package:universal_io/io.dart'; // For Platform check
 
 import 'firebase_options.dart';
 import 'logic/neuro_settings.dart';
@@ -14,7 +16,8 @@ import 'domain/download_model.dart';
 
 // Global config for the model
 final kGemmaModelConfig = DownloadModel(
-  modelUrl: "https://huggingface.co/google/gemma-2b-it-gpu-int4/resolve/main/model.bin",
+  modelUrl:
+      "https://huggingface.co/google/gemma-2b-it-gpu-int4/resolve/main/model.bin",
   modelFilename: "gemma-3n-E2B-it-int4.task",
 );
 
@@ -43,25 +46,33 @@ void main() async {
 
   // 2. Check & Load AI Model
   Widget initialScreen;
-  
-  final downloader = GemmaDownloaderDataSource(model: kGemmaModelConfig);
-  final bool isModelPresent = await downloader.checkModelExistence();
 
-  if (isModelPresent) {
-    print("✅ Model found. Loading into memory...");
-    try {
-      final path = await downloader.getFilePath();
-      await ModelHolder.loadModel(path);
-      initialScreen = const SmartDashboardScreen();
-    } catch (e) {
-      print("❌ Failed to load model: $e");
-      // If corrupt, go to setup
-      initialScreen = const SmartDashboardScreen();
-    }
+  if (kIsWeb || Platform.isWindows) {
+    print("🌍 Web/Windows detected. Skipping Local Model Setup.");
+    initialScreen = const SmartDashboardScreen();
   } else {
-    print("⚠️ Model missing. Redirecting to setup.");
-    initialScreen = const ModelSetupScreen();
+    // EXISTING LOGIC FOR MOBILE
+    final downloader = GemmaDownloaderDataSource(model: kGemmaModelConfig);
+    final bool isModelPresent = await downloader.checkModelExistence();
+
+    if (isModelPresent) {
+      print("✅ Model found. Loading into memory...");
+      try {
+        final path = await downloader.getFilePath();
+        await ModelHolder.loadModel(path);
+        initialScreen = const SmartDashboardScreen();
+      } catch (e) {
+        print("❌ Failed to load model: $e");
+        // If corrupt, go to setup
+        initialScreen = const SmartDashboardScreen();
+      }
+    } else {
+      print("⚠️ Model missing. Redirecting to setup.");
+      initialScreen = const ModelSetupScreen();
+    }
   }
+  // final downloader = GemmaDownloaderDataSource(model: kGemmaModelConfig);
+  // final bool isModelPresent = await downloader.checkModelExistence();
 
   // 3. Run App
   runApp(
