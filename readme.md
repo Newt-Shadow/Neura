@@ -22,7 +22,7 @@
   - [💻 Installation \& Setup (VS Code)](#-installation--setup-vs-code)
     - [Prerequisites](#prerequisites)
     - [Steps](#steps)
-  - [🐳 Running with Docker](#-running-with-docker)
+  - [🐳 Running with Docker (Web + Android Host)](#-running-with-docker-web--android-host)
   - [📱 Installing on Mobile](#-installing-on-mobile)
     - [Android (APK)](#android-apk)
     - [iOS (IPA)](#ios-ipa)
@@ -89,6 +89,7 @@ Follow these steps to run the source code on your local machine.
 2.  **VS Code:** With the "Flutter" and "Dart" extensions installed.
 3.  **Android Studio / Xcode:** For emulators or physical device drivers.
 4.  **Gemini API Key:** Get one from [Google AI Studio](https://aistudio.google.com/).
+5.  **Docker (Optional):** Required if you want to run the containerized Web Server or host the APK locally.
 
 ### Steps
 
@@ -124,24 +125,34 @@ Follow these steps to run the source code on your local machine.
 
 ---
 
-## 🐳 Running with Docker
+## 🐳 Running with Docker (Web + Android Host)
 
-We provide a Docker container for the **Web Version** of Neura.
+We provide a specialized Docker setup that serves both the **Web Version** of Neura and hosts the **Android APK** for easy download to your mobile device.
 
 1.  **Build the Image**
     ```bash
     docker build -t neura-app .
     ```
 
-2.  **Run the Container**
+2.  **Run the Container (Interactive Mode)**
+    * **Note:** You must use the `-it` flag to see the interactive menu and download instructions.
     ```bash
-    docker run -d -p 8080:80 --name neura-container neura-app
+    docker run -it -p 8080:80 --name neura-container neura-app
     ```
 
-3.  **Access App**
-    Open `http://localhost:8080` in your browser.
-    *(Note: Offline LLM features are disabled in the web/docker version due to browser limitations. It will default to Cloud Mode).*
+3.  **Interactive Launch Menu**
+    The container will launch a terminal menu allowing you to:
+    * Review Beta warnings.
+    * Understand Web vs. Mobile limitations (e.g., No Offline AI on Web).
+    * Launch the dual-mode server.
 
+4.  **Access the App**
+    * **🖥️ Web App:** Open `http://localhost:8080` in Chrome.
+    * **📱 Android APK:**
+        * **On PC:** Download directly from `http://localhost:8080/neura.apk`
+        * **On Phone:** Connect your phone to the same Wi-Fi as your PC, find your PC's Local IP (e.g., `192.168.1.5`), and visit `http://192.168.1.5:8080/neura.apk`.
+
+> **Note:** The Web version running in Docker defaults to **Cloud Mode** (API) to ensure stability, as browser-based local LLMs require specific hardware acceleration (WebGPU) that is difficult to virtualize in standard containers.
 ---
 
 ## 📱 Installing on Mobile
