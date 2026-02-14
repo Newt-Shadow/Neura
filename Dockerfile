@@ -20,7 +20,8 @@ COPY . .
 # 3. Build Web App (WASM + CanvasKit optimized)
 # We accept Android licenses to prevent build blocking
 RUN yes | flutter doctor --android-licenses
-RUN flutter build web --release --wasm --no-tree-shake-icons
+RUN flutter build web --release --no-tree-shake-icons
+
 
 # 4. Build Android APK
 RUN flutter build apk --release

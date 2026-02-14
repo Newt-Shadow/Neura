@@ -8,6 +8,6 @@ build
 android/.gradle
 ios
 macos
-web
+
 windows
 linux
