@@ -186,6 +186,7 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         filled: true,
         fillColor: Colors.grey.shade50,
+        
       ),
     );
   }
