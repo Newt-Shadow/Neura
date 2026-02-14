@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_gemma/flutter_gemma.dart';
-
+import 'panic_mode_screen.dart';
+import 'body_double_screen.dart';
 import '../logic/neuro_settings.dart';
 import '../logic/model_holder.dart';
 import '../data/downloader_datasource.dart';
@@ -100,6 +101,20 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
                 ),
               ],
             ),
+          ),
+          // 🚨 PANIC BUTTON
+          IconButton(
+            icon: const Icon(Icons.volunteer_activism, color: Colors.pinkAccent),
+            tooltip: "Sensory Rescue",
+            onPressed: () {
+              Navigator.push(
+                context,
+                PageRouteBuilder(
+                  pageBuilder: (_, __, ___) => const PanicModeScreen(),
+                  transitionsBuilder: (_, a, __, c) => FadeTransition(opacity: a, child: c),
+                ),
+              );
+            },
           ),
           // Sign In / Profile Button
           if (isGuest)
@@ -232,6 +247,21 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
                 } else {
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const TaskBreakdownScreen()));
                 }
+              },
+            ),
+            const SizedBox(height: 24),
+
+            _HeroCard(
+              title: "Body Double",
+              subtitle: "Work together. No pressure.",
+              icon: Icons.people_outline,
+              color: Colors.purple.shade50,
+              iconColor: Colors.purple,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const BodyDoubleScreen()),
+                );
               },
             ),
 

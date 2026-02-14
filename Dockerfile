@@ -1,64 +1,66 @@
 # ==============================================================================
-# STAGE 1: BUILD ENVIROMENT
-# We use a pre-configured image with Flutter & Android SDK to save setup time.
+# STAGE 1: BUILDER
 # ==============================================================================
-FROM ghcr.io/cirruslabs/flutter:3.41.0 AS builder
+FROM ghcr.io/cirruslabs/flutter:3.29.0 AS build
 
+# Set build arguments (optional)
+ARG BUILD_VERSION=1.0.0
+ENV FLUTTER_Web_RENDERER=canvaskit
 
-# Set working directory
 WORKDIR /app
 
-# 1. Copy dependencies first to cache them
+# 1. Dependency Caching Layer
+# Copy only pubspec files first. Docker will cache this layer if pubspec doesn't change.
 COPY pubspec.yaml pubspec.lock ./
-
-# Get packages (clean install)
 RUN flutter pub get
 
-# 2. Copy the rest of the application code
+# 2. Copy Source Code
 COPY . .
 
-# 3. Build the Android APK
-# We use --release for a performance-optimized build
+# 3. Build Web App (WASM + CanvasKit optimized)
+# We accept Android licenses to prevent build blocking
+RUN yes | flutter doctor --android-licenses
+RUN flutter build web --release --wasm --no-tree-shake-icons
+
+# 4. Build Android APK
 RUN flutter build apk --release
 
 # ==============================================================================
-# STAGE 2: RUNTIME DISTRIBUTION SERVER
-# We use Nginx to serve the built APK.
+# STAGE 2: PRODUCTION SERVER (NGINX)
 # ==============================================================================
 FROM nginx:alpine
 
-# 1. Create a directory to host the download
+# Metadata
+LABEL maintainer="Neura Team"
+LABEL version="1.0"
+LABEL description="Neura AI Assistant - Web & Android Host"
+
+# 1. Install utilities for the entrypoint script (Bash for logic, iproute2 for IP detection)
+RUN apk add --no-cache bash iproute2 ncurses
+
 WORKDIR /usr/share/nginx/html
 
-# 2. Copy the built APK from the 'builder' stage
-COPY --from=builder /app/build/app/outputs/flutter-apk/app-release.apk ./neuro_app.apk
+# 2. Clean default Nginx files
+RUN rm -rf ./*
 
-# 3. Create a simple Landing Page for the Judges
-RUN echo '<!DOCTYPE html>\
-<html>\
-<head>\
-    <title>Neuro App Distribution</title>\
-    <style>\
-        body { font-family: sans-serif; text-align: center; padding: 50px; background: #f0f4f8; }\
-        .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: inline-block; }\
-        h1 { color: #009688; }\
-        p { color: #555; }\
-        .btn { display: inline-block; background: #009688; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-top: 20px; }\
-        .btn:hover { background: #00796b; }\
-    </style>\
-</head>\
-<body>\
-    <div class="card">\
-        <h1>Neuro App Ready</h1>\
-        <p>The solution has been successfully built inside this isolated environment.</p>\
-        <p><strong>Note:</strong> This app uses on-device AI and Vision, so it requires an Android device.</p>\
-        <a href="neuro_app.apk" class="btn" download>⬇ Download APK</a>\
-    </div>\
-</body>\
-</html>' > index.html
+# 3. Copy Web Build Artifacts
+COPY --from=build /app/build/web ./
 
-# 4. Expose Port 80
+# 4. Copy Android APK & Rename
+COPY --from=build /app/build/app/outputs/flutter-apk/app-release.apk ./neura.apk
+
+# 5. Copy Custom Configurations
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+
+# 6. Permissions & Safety
+RUN chmod +x /usr/local/bin/entrypoint.sh && \
+    chown -R nginx:nginx /usr/share/nginx/html
+
+# 7. Healthcheck (Checks if Nginx is responding)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://localhost/ || exit 1
+
+# 8. Expose & Entry
 EXPOSE 80
-
-# 5. Start Nginx
-CMD ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

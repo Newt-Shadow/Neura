@@ -31,6 +31,8 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
 
   final ImagePicker _picker = ImagePicker();
   final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _isListening = false;
+  String _textBeforeListening = "";
   final TextEditingController _textController = TextEditingController();
 
   Uint8List? _pendingImageBytes;
@@ -52,6 +54,44 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
       await storage.write(key: 'device_user_id', value: deviceId);
     }
     return deviceId;
+  }
+
+  void _toggleListening() async {
+    if (!_isListening) {
+      bool available = await _speech.initialize(
+        onStatus: (val) {
+          if (val == 'done' || val == 'notListening') {
+            setState(() => _isListening = false);
+          }
+        },
+        onError: (val) => setState(() => _isListening = false),
+      );
+
+      if (available) {
+        setState(() {
+          _isListening = true;
+          _textBeforeListening = _textController.text; // Save typed text
+        });
+        
+        _speech.listen(
+          onResult: (val) {
+            setState(() {
+              // Smart Append: Keep old text + Add new spoken text
+              String spacer = (_textBeforeListening.isNotEmpty && !_textBeforeListening.endsWith(' ')) ? " " : "";
+              _textController.text = "$_textBeforeListening$spacer${val.recognizedWords}";
+              
+              // Move cursor to end
+              _textController.selection = TextSelection.fromPosition(
+                TextPosition(offset: _textController.text.length)
+              );
+            });
+          },
+        );
+      }
+    } else {
+      setState(() => _isListening = false);
+      _speech.stop();
+    }
   }
 
   // ==========================================================
@@ -420,6 +460,13 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
                   border: InputBorder.none,
                 ),
               ),
+            ),
+            IconButton(
+              icon: Icon(
+                _isListening ? Icons.mic : Icons.mic_none,
+                color: _isListening ? Colors.red : Colors.grey,
+              ),
+              onPressed: _toggleListening,
             ),
             FloatingActionButton(
               mini: true,
