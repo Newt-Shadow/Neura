@@ -100,6 +100,10 @@ class NeuroSettings extends ChangeNotifier {
       _profile = Map<String, String>.from(json.decode(profileJson));
     }
 
+    if (_profile.isNotEmpty) {
+      _parseDynamicState();
+    }
+
     _useLocalModel = prefs.getBool('use_local_model') ?? false;
     _streakCount = prefs.getInt('streak') ?? 0;
     _energyLevel = prefs.getDouble('energy_level') ?? 0.5;
@@ -121,6 +125,16 @@ class NeuroSettings extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _parseDynamicState() {
+    if (_profile.containsKey('energy')) {
+      _energyLevel = double.tryParse(_profile['energy']!) ?? 0.5;
+    }
+    if (_profile.containsKey('overwhelmed')) {
+      _isOverwhelmed = _profile['overwhelmed'] == 'true';
+    }
+    notifyListeners();
+  }
+
   // ============================================================
   // 🔑 API KEY
   // ============================================================
@@ -135,18 +149,37 @@ class NeuroSettings extends ChangeNotifier {
   // 🧠 ENERGY
   // ============================================================
 
-  void setEnergy(double value) async {
-    _energyLevel = value;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('energy_level', value);
+  void setEnergy(double value) {
+    _energyLevel = value.clamp(0.0, 1.0); // Keep between 0 and 1
+    _profile['energy'] = _energyLevel.toString();
+    
+    // Auto-trigger overwhelm if energy drops too low
+    if (_energyLevel < 0.2) _isOverwhelmed = true;
+    
     notifyListeners();
+    _saveToLocal(); // Save to phone
+    _saveToCloud(); // Save to Firebase
   }
 
-  void setOverwhelm(bool value) async {
+  void setOverwhelm(bool value) {
     _isOverwhelmed = value;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('is_overwhelmed', value);
+    _profile['overwhelmed'] = value.toString();
     notifyListeners();
+    _saveToLocal();
+    _saveToCloud();
+  }
+
+  void adaptToTaskPerformance({required int estimatedSec, required int actualSec}) {
+    // 1. If user was 2x slower than expected -> Drop Energy
+    if (actualSec > (estimatedSec * 2)) {
+      setEnergy(_energyLevel - 0.1); 
+      print("📉 Slow progress detected. Energy lowered to $_energyLevel");
+    } 
+    // 2. If user was fast (used < 80% of time) -> Boost Energy (Momentum)
+    else if (actualSec < (estimatedSec * 0.8)) {
+      setEnergy(_energyLevel + 0.05);
+      print("🚀 Momentum detected. Energy boosted to $_energyLevel");
+    }
   }
 
   // 🆕 Toggle Local LLM
@@ -363,8 +396,7 @@ USER PROFILE:
       if (kIsWeb) {
         // 🌐 WEB LOGIN (Popup prevents manual URI headache)
         final provider = GoogleAuthProvider();
-        userCredential =
-            await FirebaseAuth.instance.signInWithPopup(provider);
+        userCredential = await FirebaseAuth.instance.signInWithPopup(provider);
       } else {
         // 📱 MOBILE LOGIN
         final googleUser = await _googleSignIn.signIn();
@@ -380,13 +412,14 @@ USER PROFILE:
           idToken: googleAuth.idToken,
         );
 
-        userCredential =
-            await FirebaseAuth.instance.signInWithCredential(credential);
+        userCredential = await FirebaseAuth.instance.signInWithCredential(
+          credential,
+        );
       }
 
       // 🔥 CRITICAL: Pull existing data BEFORE auto-save kicks in
       await _forceInitialPullFromCloud(userCredential.user!.uid);
-      
+
       // Start Real-time sync
       startCloudListener();
 
@@ -431,26 +464,30 @@ USER PROFILE:
         .collection('users')
         .doc(currentUser!.uid)
         .snapshots()
-        .listen((doc) {
-      if (doc.exists && doc.data() != null) {
-        final data = doc.data()!;
-        if (data['encrypted_profile'] == null ||
-            data['encrypted_profile'] == '') return;
+        .listen(
+          (doc) {
+            if (doc.exists && doc.data() != null) {
+              final data = doc.data()!;
+              if (data['encrypted_profile'] == null ||
+                  data['encrypted_profile'] == '')
+                return;
 
-        final remoteProfile = _decryptMap(data['encrypted_profile']);
+              final remoteProfile = _decryptMap(data['encrypted_profile']);
 
-        // Only update if remote is actually different to avoid infinite loops
-        if (json.encode(_profile) != json.encode(remoteProfile)) {
-          _profile = remoteProfile;
-          _streakCount = data['streak'] ?? _streakCount;
-          _saveToLocal();
-          notifyListeners();
-          print("🔄 Devices Synced in Real-time.");
-        }
-      }
-    }, onError: (e) {
-       print("⚠️ Stream Error: $e");
-    });
+              // Only update if remote is actually different to avoid infinite loops
+              if (json.encode(_profile) != json.encode(remoteProfile)) {
+                _profile = remoteProfile;
+                _streakCount = data['streak'] ?? _streakCount;
+                _saveToLocal();
+                notifyListeners();
+                print("🔄 Devices Synced in Real-time.");
+              }
+            }
+          },
+          onError: (e) {
+            print("⚠️ Stream Error: $e");
+          },
+        );
   }
 
   Future<void> signOut() async {

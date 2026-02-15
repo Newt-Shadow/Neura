@@ -77,7 +77,7 @@ class _DebugLogScreenState extends State<DebugLogScreen> {
               backgroundColor: const Color(0xFF21262D),
               selectedColor: _getColor(type).withOpacity(0.3),
               labelStyle: TextStyle(
-                color: isSelected ? _getColor(type) : Colors.grey,
+                color: isSelected ? _getColor(type) : const Color.fromARGB(255, 126, 218, 241),
                 fontWeight: FontWeight.bold,
                 fontSize: 10,
               ),
@@ -97,7 +97,7 @@ class _DebugLogScreenState extends State<DebugLogScreen> {
       case LogType.llm: return Colors.greenAccent;
       case LogType.error: return Colors.redAccent;
       case LogType.user: return Colors.purpleAccent;
-      default: return Colors.white;
+      default: return const Color.fromARGB(255, 48, 48, 48);
     }
   }
 }

@@ -15,6 +15,7 @@ class PromptBuilder {
     buffer.writeln(
       "MISSION: Convert vague intentions into immediate physical actions.",
     );
+    buffer.writeln("CONTEXT: Energy=${(energyLevel * 100).toInt()}% (Dynamic), Overwhelmed=$isOverwhelmed");
 
     // ==========================
     // SCENE REASONING PROTOCOL
@@ -51,6 +52,21 @@ TEXT REASONING PROTOCOL (NO IMAGE):
 """);
     }
 
+    buffer.writeln("""
+STEP COUNT PROTOCOL:
+- ANALYZE SITUATION: Is this a simple task (e.g. "Drink water") or complex (e.g. "Clean room")?
+Calculate 'Target Step Count' based on these factors:
+
+[TASK COMPLEXITY]
+- Simple (e.g., "Drink water", "Put on shoes") -> 3-5 steps.
+- Medium (e.g., "Clear desk", "Pack bag") -> 5-8 steps.
+- Complex (e.g., "Clean room", "Cook dinner") -> 7-16 steps.
+
+- OVERWHELM HANDLING:
+  * If Overwhelmed=true: Generate the FULL plan internally, but OUTPUT ONLY the first 3 steps. Add a "Continue" option.
+  * If Energy < 0.3: Reduce total steps by grouping actions (e.g., "Grab shoes and keys" instead of two steps).
+""");
+
     // ==========================
     // ANTI OVERWHELM
     // ==========================
@@ -73,7 +89,7 @@ Low energy mode:
     } else {
       buffer.writeln("""
 Momentum mode:
-- Max 7 steps.
+- Max 20 steps.
 - Each <60 seconds.
 """);
     }
@@ -107,7 +123,7 @@ AUTISM MODE:
     }
 
     // --- DYSLEXIA ---
-    if (diagnosis.contains("DYSLEXI")) {
+    if (diagnosis.contains("DYSLEXI") || diagnosis.contains("DYSLEX") || diagnosis.contains("DISLEX") || diagnosis.contains("READING")) {
       buffer.writeln("""
 DYSLEXIA MODE:
 - FORMAT: Use bullet points strictly.
@@ -118,7 +134,7 @@ DYSLEXIA MODE:
     }
 
     // --- ANXIETY ---
-    if (diagnosis.contains("ANXIETY") || isOverwhelmed) {
+    if (diagnosis.contains("ANXIETY") || diagnosis.contains("PANIC") || isOverwhelmed) {
       buffer.writeln("""
 ANXIETY REDUCTION MODE:
 - TONE: Calming, grounding, non-judgmental.

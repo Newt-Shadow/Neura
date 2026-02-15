@@ -169,6 +169,43 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
 
                   const SizedBox(height: 30),
                   const Divider(),
+
+                  const Text("Current Brain State", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text("Helps the AI adapt its tone right now.", style: TextStyle(color: Colors.grey)),
+                  const SizedBox(height: 10),
+
+                  // ENERGY SLIDER
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text("Energy Level"),
+                    subtitle: Text(
+                      settings.energyLevel > 0.7 ? "High Energy 🚀" : 
+                      settings.energyLevel > 0.3 ? "Balanced 😐" : "Low Battery 🪫"
+                    ),
+                    trailing: Text("${(settings.energyLevel * 100).toInt()}%"),
+                  ),
+                  Slider(
+                    value: settings.energyLevel,
+                    min: 0.0,
+                    max: 1.0,
+                    divisions: 10,
+                    activeColor: Colors.teal,
+                    label: "${(settings.energyLevel * 100).toInt()}%",
+                    onChanged: (val) => settings.setEnergy(val),
+                  ),
+
+                  // OVERWHELM SWITCH
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text("I am Overwhelmed"),
+                    subtitle: const Text("Activates 'Panic Mode' (simpler steps, gentler tone)."),
+                    value: settings.isOverwhelmed,
+                    activeColor: Colors.pinkAccent,
+                    onChanged: (val) => settings.setOverwhelm(val),
+                  ),
+
+                  const SizedBox(height: 10),
+                  const Divider(),
                   
                   // --- 2. APP PREFERENCES ---
                   const Text("Preferences", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),

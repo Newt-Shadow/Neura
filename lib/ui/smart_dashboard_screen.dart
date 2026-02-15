@@ -129,24 +129,35 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
                 );
               },
             ),
-          // 🚨 PANIC BUTTON
+          // 🔋 BRAIN BATTERY (Fixed)
           IconButton(
-            icon: const Icon(
-              Icons.volunteer_activism,
-              color: Colors.pinkAccent,
+            onPressed: () => _showBrainStateMenu(context, settings),
+            icon: Icon(
+              settings.isOverwhelmed
+                  ? Icons.battery_alert
+                  : _getBatteryIcon(settings.energyLevel),
+              color: _getBatteryColor(settings.energyLevel),
             ),
-            tooltip: "Sensory Rescue",
-            onPressed: () {
-              Navigator.push(
-                context,
-                PageRouteBuilder(
-                  pageBuilder: (_, __, ___) => const PanicModeScreen(),
-                  transitionsBuilder: (_, a, __, c) =>
-                      FadeTransition(opacity: a, child: c),
-                ),
-              );
-            },
           ),
+
+          // 🚨 PANIC BUTTON
+          // IconButton(
+          //   icon: const Icon(
+          //     Icons.volunteer_activism,
+          //     color: Colors.pinkAccent,
+          //   ),
+          //   tooltip: "Sensory Rescue",
+          //   onPressed: () {
+          //     Navigator.push(
+          //       context,
+          //       PageRouteBuilder(
+          //         pageBuilder: (_, __, ___) => const PanicModeScreen(),
+          //         transitionsBuilder: (_, a, __, c) =>
+          //             FadeTransition(opacity: a, child: c),
+          //       ),
+          //     );
+          //   },
+          // ),
           // Sign In / Profile Button
           if (isGuest)
             Padding(
@@ -279,6 +290,16 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
               style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
+            Text(
+              settings.isOverwhelmed
+                  ? "Panic Mode Active 🛡️"
+                  : "Ready to focus",
+              style: TextStyle(
+                color: settings.isOverwhelmed ? Colors.pink : Colors.grey,
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 8),
             const Text(
               "One step at a time.",
@@ -356,6 +377,75 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
         ),
       ),
     ).animate().scale(duration: 300.ms, curve: Curves.easeOutBack);
+  }
+
+  IconData _getBatteryIcon(double level) {
+    if (level > 0.8) return Icons.battery_full;
+    if (level > 0.5)
+      return Icons
+          .battery_5_bar; // Replaces battery_std (consistent horizontal)
+    if (level > 0.2)
+      return Icons.battery_2_bar; // Replaces battery_low (ERROR FIX)
+    return Icons.battery_0_bar;
+  }
+
+  Color _getBatteryColor(double level) {
+    if (level > 0.6) return Colors.teal;
+    if (level > 0.3) return Colors.orange;
+    return Colors.red;
+  }
+
+  void _showBrainStateMenu(BuildContext context, NeuroSettings settings) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        // ✅ ADDED SAFEAREA to fix navigation overlap
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Brain Battery Check 🔋",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 20),
+
+                const Text("How much energy do you have?"),
+                Slider(
+                  value: settings.energyLevel,
+                  min: 0.0,
+                  max: 1.0,
+                  divisions: 5,
+                  activeColor: _getBatteryColor(settings.energyLevel),
+                  label: "${(settings.energyLevel * 100).toInt()}%",
+                  onChanged: (val) => settings.setEnergy(val),
+                ),
+
+                const SizedBox(height: 10),
+
+                SwitchListTile(
+                  title: const Text("I am Overwhelmed"),
+                  subtitle: const Text("Switch to 'Panic Mode' (Gentler AI)"),
+                  value: settings.isOverwhelmed,
+                  activeColor: Colors.pink,
+                  contentPadding: EdgeInsets.zero,
+                  onChanged: (val) {
+                    settings.setOverwhelm(val);
+                    Navigator.pop(ctx);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
