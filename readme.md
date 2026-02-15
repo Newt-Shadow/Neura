@@ -94,7 +94,7 @@ Follow these steps to run the source code on your local machine.
 1.  **Clone the Repository**
     Open your terminal and run:
     ```bash
-    git clone [https://github.com/Newt-Shadow/Neura.git](https://github.com/Newt-Shadow/Neura.git)
+    git clone https://github.com/Newt-Shadow/Neura.git
     cd neura
     ```
 
@@ -194,8 +194,7 @@ To judge the full experience, installing on a physical device is recommended.
 
 We take safety seriously.
 * **Data Redaction:** Before any text is analyzed, a local algorithm scans for patterns like emails (`[REDACTED_EMAIL]`) and phone numbers to ensure they never reach the cloud.
-* **Secure Storage:** Chat logs and images are encrypted with AES-256 before being stored. When synced to the cloud for backup, they are encrypted with a key that **is stored in the device's hardware-backed Keystore (Android) or Keychain (iOS)**. We cannot read your chats.
-
+* **Secure Storage:** Chat logs and images are encrypted with AES-256 before being stored. When synced to the cloud for backup, they are encrypted with a key that **is stored in the device's hardware-backed Keystore (Android) or Keychain (iOS)**.
 ---
 
 **Built with Neurological >_< for the Hackathon.**
