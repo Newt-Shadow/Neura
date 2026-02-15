@@ -17,11 +17,11 @@ class LanguageDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     return DropdownButton<String>(
       value: linguaSelezionata,
-      hint: const Text('Seleziona lingua'),
+      hint: const Text('Select Language'),
       items: lingue.map((lingua) {
         return DropdownMenuItem<String>(
           value: lingua.nome,
-          child: Text('${lingua.nome} (${lingua.livello})'),
+          child: Text('${lingua.nome} ${lingua.flag}'),
         );
       }).toList(),
       onChanged: onChanged,

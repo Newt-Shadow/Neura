@@ -36,6 +36,7 @@ class RemoteAIService {
         energyLevel: energy,
         isOverwhelmed: isOverwhelmed,
         hasImage: hasImage,
+        language: userSettings.preferredLanguage,
       );
 
       final model = GenerativeModel(

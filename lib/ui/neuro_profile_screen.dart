@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../logic/neuro_settings.dart';
+// ✅ Import the necessary files
+import 'language_dropdown.dart'; 
+import '../localization/lingua_supportata.dart';
+import '../localization/load_lingue.dart'; 
 
 class NeuroProfileScreen extends StatefulWidget {
   const NeuroProfileScreen({super.key});
@@ -26,6 +30,10 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
 
   bool _userIsTyping = false;
 
+  // ✅ Added State variables for Language
+  List<LinguaSupportata> _supportedLanguages = [];
+  bool _isLoadingLanguages = true;
+
   @override
   void initState() {
     super.initState();
@@ -35,20 +43,40 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
     _sensoryCtrl = TextEditingController(text: settings.sensoryTriggers);
     _interestCtrl = TextEditingController(text: settings.interest);
 
+    // ✅ Load languages when screen starts
+    _loadLanguages();
+
     void setTyping() => _userIsTyping = true;
     void clearTyping() => _userIsTyping = false;
 
-    // Track typing to prevent overwriting user input
+    // Track typing
     _nameCtrl.addListener(setTyping);
     _diagnosisCtrl.addListener(setTyping);
     _sensoryCtrl.addListener(setTyping);
     _interestCtrl.addListener(setTyping);
 
-    // Attach Listeners: Save immediately when user leaves a text box
+    // Attach Listeners
     _nameFocus.addListener(() { if (!_nameFocus.hasFocus) { clearTyping(); _onFocusLost(_nameFocus); }});
     _diagnosisFocus.addListener(() { if (!_diagnosisFocus.hasFocus) { clearTyping(); _onFocusLost(_diagnosisFocus); }});
     _sensoryFocus.addListener(() { if (!_sensoryFocus.hasFocus) { clearTyping(); _onFocusLost(_sensoryFocus); }});
     _interestFocus.addListener(() { if (!_interestFocus.hasFocus) { clearTyping(); _onFocusLost(_interestFocus); }});
+  }
+
+  // ✅ Function to load languages from JSON
+  Future<void> _loadLanguages() async {
+    try {
+      // ✅ FIXED: Calling the static class method properly
+      final list = await LoadLingue.leggiLingueSupportate(); 
+      if (mounted) {
+        setState(() {
+          _supportedLanguages = list;
+          _isLoadingLanguages = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading languages: $e");
+      if (mounted) setState(() => _isLoadingLanguages = false);
+    }
   }
 
   @override
@@ -56,9 +84,6 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
     super.didChangeDependencies();
     final settings = context.watch<NeuroSettings>();
 
-    // 🔥 RACE CONDITION FIX: 
-    // If Cloud Data arrives late (e.g., after reinstall), update the text fields
-    // UNLESS the user is currently typing.
     if (!_userIsTyping) {
       if (_nameCtrl.text == "Friend" && settings.userName != "Friend") {
         _nameCtrl.text = settings.userName;
@@ -77,10 +102,6 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
 
   @override
   void dispose() {
-    // ⚠️ CRITICAL FIX: DO NOT call _performSave() here.
-    // Saving in dispose causes the "deactivated widget" crash.
-    // PopScope handles the save on exit.
-
     _nameCtrl.dispose();
     _diagnosisCtrl.dispose();
     _sensoryCtrl.dispose();
@@ -93,25 +114,23 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
     super.dispose();
   }
 
-  // Triggered whenever a field gains or loses focus
   void _onFocusLost(FocusNode node) {
     if (!node.hasFocus) {
-      // User left the text area -> Sync immediately
       _performSave(silent: true);
     }
   }
 
   void _performSave({bool silent = false}) {
-    // Basic validation check
     if (_nameCtrl.text.trim().isEmpty) return;
+    if (!mounted) return;
 
-    if (!mounted) return; // Safety check
+    final currentLang = context.read<NeuroSettings>().preferredLanguage;
 
     context.read<NeuroSettings>().saveProfile(
       name: _nameCtrl.text,
       diagnosis: _diagnosisCtrl.text,
       sensory: _sensoryCtrl.text,
-      language: "English",
+      language: currentLang, // Use the selected language
       interest: _interestCtrl.text,
     );
 
@@ -119,8 +138,6 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Profile Saved & Encrypted 🔒")),
       );
-    } else {
-      print("☁️ Auto-Syncing Profile...");
     }
   }
 
@@ -128,8 +145,6 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
   Widget build(BuildContext context) {
     final settings = context.watch<NeuroSettings>();
 
-    // PopScope ensures data is saved when user hits "Back"
-    // This runs BEFORE dispose, making it safe.
     return PopScope(
       canPop: true,
       onPopInvokedWithResult: (didPop, result) {
@@ -166,6 +181,38 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
                   
                   _buildTextField("Special Interest", _interestCtrl, Icons.favorite, _interestFocus,
                     hint: "e.g. Coding, Art, Space (Used for metaphors)"),
+
+                  const SizedBox(height: 15),
+
+                  // ✅ LANGUAGE DROPDOWN ADDED HERE
+                  const Text("Assistant Language", style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  _isLoadingLanguages
+                      ? const LinearProgressIndicator()
+                      : Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(12),
+                            color: Colors.grey.shade50,
+                          ),
+                          child: LanguageDropdown(
+                            lingue: _supportedLanguages,
+                            linguaSelezionata: settings.preferredLanguage,
+                            onChanged: (newLang) {
+                              if (newLang != null) {
+                                // Save immediately when language changes
+                                context.read<NeuroSettings>().saveProfile(
+                                  name: _nameCtrl.text,
+                                  diagnosis: _diagnosisCtrl.text,
+                                  sensory: _sensoryCtrl.text,
+                                  language: newLang,
+                                  interest: _interestCtrl.text,
+                                );
+                              }
+                            },
+                          ),
+                        ),
 
                   const SizedBox(height: 30),
                   const Divider(),
@@ -228,7 +275,7 @@ class _NeuroProfileScreenState extends State<NeuroProfileScreen> {
 
                   const SizedBox(height: 30),
                   
-                  // Manual Button (Kept for reassurance)
+                  // Manual Button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(

@@ -75,6 +75,7 @@ flutter:
     - .env
     - assets/strings_it.json
     - assets/strings_en.json
+    - assets/strings_hi.json
     - assets/strings_fr.json
     - assets/strings_es.json
     - assets/strings_de.json

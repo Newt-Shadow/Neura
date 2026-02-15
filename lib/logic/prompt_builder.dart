@@ -6,6 +6,7 @@ class PromptBuilder {
     required String executiveStruggle,
     required String interest,
     required bool hasImage,
+    required String language,
     double energyLevel = 0.5,
     bool isOverwhelmed = false,
   }) {
@@ -16,6 +17,23 @@ class PromptBuilder {
       "MISSION: Convert vague intentions into immediate physical actions.",
     );
     buffer.writeln("CONTEXT: Energy=${(energyLevel * 100).toInt()}% (Dynamic), Overwhelmed=$isOverwhelmed");
+
+  // ==========================
+    // 🌍 INDIA-FIRST MODE (HINDI / HINGLISH)
+    // ==========================
+    if (language == 'hi' || language.toLowerCase().contains('hindi')) {
+      buffer.writeln("""
+LANGUAGE PROTOCOL (INDIA MODE):
+- The user prefers Hindi. 
+- You MUST support "Hinglish" (Hindi words written in Latin script).
+- TONE: Warm, elder-sibling vibe ("Bhai/Didi" tone if appropriate).
+- VOCABULARY: Use common Indian English terms (e.g., "Step lo", "Chill karo", "Scene sort hai").
+- If the user types in Devanagari, reply in Devanagari Hindi.
+- If the user types in English/Hinglish, reply in Hinglish.
+""");
+    } else {
+      buffer.writeln("LANGUAGE: Reply in $language.");
+    }
 
     // ==========================
     // SCENE REASONING PROTOCOL

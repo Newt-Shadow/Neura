@@ -1,24 +1,29 @@
 {
   "lingue_supportate": [
     {
-      "code": "it",
-      "nome": "Italiano",
-      "flag": "🇮🇹"
-    },
-    {
       "code": "en",
       "nome": "English",
       "flag": "🇬🇧"
     },
     {
-      "code": "fr",
-      "nome": "Français",
-      "flag": "🇫🇷"
+      "code": "hi",
+      "nome": "Hindi / Hinglish",
+      "flag": "🇮🇳"
+    },
+    {
+      "code": "it",
+      "nome": "Italiano",
+      "flag": "🇮🇹"
     },
     {
       "code": "es",
       "nome": "Español",
       "flag": "🇪🇸"
+    },
+    {
+      "code": "fr",
+      "nome": "Français",
+      "flag": "🇫🇷"
     },
     {
       "code": "de",

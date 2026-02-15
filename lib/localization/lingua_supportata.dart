@@ -1,13 +1,13 @@
 class LinguaSupportata {
   final String nome;
-  final String livello;
+  final String flag;
 
-  LinguaSupportata({required this.nome, required this.livello});
+  LinguaSupportata({required this.nome, required this.flag});
 
   factory LinguaSupportata.fromJson(Map<String, dynamic> json) {
     return LinguaSupportata(
       nome: json['nome'],
-      livello: json['livello'],
+      flag: json['flag'],
     );
   }
 } 
