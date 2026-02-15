@@ -13,8 +13,8 @@ import 'package:uuid/uuid.dart';
 import 'package:confetti/confetti.dart'; 
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_tts/flutter_tts.dart'; 
-import '../logic/task_classifier.dart'; 
 
+import '../logic/task_classifier.dart'; 
 import '../logic/advanced_logger.dart'; 
 import '../logic/remote_ai_service.dart';
 import '../logic/neuro_settings.dart';
@@ -79,9 +79,56 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     _startSmartBodyDouble(); 
   }
 
+  // ------------------------------------------------------------------------
+  // 🔊 FIX 1: Corrected TTS Logic & Audio Setup
+  // ------------------------------------------------------------------------
   Future<void> _initTts() async {
-    await _tts.setLanguage("en-US");
+    // UX FIX: Allow audio to mix with others and play even if silent switch is on (iOS)
+    await _tts.setIosAudioCategory(IosTextToSpeechAudioCategory.playback, [
+      IosTextToSpeechAudioCategoryOptions.allowBluetooth,
+      IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
+      IosTextToSpeechAudioCategoryOptions.mixWithOthers
+    ]);
+
     await _tts.setSpeechRate(0.5);
+    await _tts.setPitch(1.0);
+    await _tts.awaitSpeakCompletion(true); 
+  }
+
+  Future<void> _speak(String text) async {
+    if (text.isEmpty) return;
+
+    try {
+      final settings = context.read<NeuroSettings>();
+      
+      // 1. Get the language String from settings (e.g. "Italiano", "Hindi")
+      // In NeuroSettings, 'preferredLanguage' returns a String, not an object.
+      final String selectedLangName = settings.preferredLanguage.toLowerCase();
+
+      // 2. Map the name to a TTS Locale Code
+      String locale = "en-US"; // Default
+
+      if (selectedLangName.contains("italiano")) {
+        locale = "it-IT";
+      } else if (selectedLangName.contains("hindi")) {
+        locale = "hi-IN"; // Handles Hinglish well
+      } else if (selectedLangName.contains("español") || selectedLangName.contains("spanish")) {
+        locale = "es-ES";
+      } else if (selectedLangName.contains("deutsch") || selectedLangName.contains("german")) {
+        locale = "de-DE";
+      } else if (selectedLangName.contains("français") || selectedLangName.contains("french")) {
+        locale = "fr-FR";
+      }
+
+      // 3. Apply and Speak
+      await _tts.setLanguage(locale);
+      await _tts.speak(text);
+    } catch (e) {
+      debugPrint("TTS Error: $e");
+      // Fallback if something fails
+      await _tts.setLanguage("en-US");
+      await _tts.speak(text);
+    }
   }
 
   @override
@@ -123,7 +170,7 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     final currentStep = _steps[_focusIndex];
     String msg = _getSmartBodyDoubleMessage(level, currentStep);
 
-    await _tts.speak(msg);
+    await _speak(msg);
 
     if (mounted) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -152,18 +199,14 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     }
   }
 
- 
-  
   String _getSmartBodyDoubleMessage(int level, Map<String, dynamic> step) {
     // 1. INPUT ANALYSIS
     final text = step['text'].toString();
     final seconds = step['seconds'] as int? ?? 60;
     final settings = context.read<NeuroSettings>();
     
-   
     final TaskType type = TaskClassifier.classify(text);
     final String subject = _extractTaskSubject(text); 
-    
 
     final bool isLowEnergy = settings.energyLevel < 0.4;
     final bool isOverwhelmed = settings.isOverwhelmed;
@@ -180,7 +223,6 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     }
 
     // --- LEVEL 1: MAINTENANCE (The Gentle Nudge) ---
-   
     if (level == 1) {
       if (isHighEnergy && type == TaskType.physical) {
         return _random([
@@ -212,7 +254,6 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     }
 
     // --- LEVEL 2: UNBLOCKING (The Tactical Coach) ---
-    
     if (level == 2) {
       // Strategy: "Novelty" for ADHD
       if (type == TaskType.physical) {
@@ -241,7 +282,6 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     }
 
     // --- LEVEL 3: SALVAGE (Permission & Compassion) ---
-    
     if (level == 3) {
       if (isLong) return "This step is too big for today's brain. Let's skip it and stay winning.";
       
@@ -255,16 +295,13 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     return "You are doing great.";
   }
 
-  
   String _extractTaskSubject(String text) {
     final words = text.split(' ');
-    // Heuristic: The longest word is usually the subject in short commands
     if (words.isEmpty) return "task";
     String longest = words.reduce((a, b) => a.length > b.length ? a : b);
     return longest.replaceAll(RegExp(r'[^\w\s]'), '');
   }
 
-  
   String _random(List<String> options) {
     return options[Random().nextInt(options.length)];
   }
@@ -278,7 +315,6 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
       double ratio = actual / estimated;
       ratio = ratio.clamp(0.5, 3.0); 
       _paceHistory.add(ratio);
-      
       
       double sum = _paceHistory.fold(0, (p, c) => p + c);
       setState(() {
@@ -438,7 +474,7 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
 
         if (_isBodyDoubleActive) {
           _stepStopwatch.start();
-          _tts.speak("I'm monitoring. Let's start: ${_steps[0]['text']}");
+          _speak("I'm monitoring. Let's start: ${_steps[0]['text']}");
         }
       }
     } catch (e) {
@@ -483,16 +519,16 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
       Future.delayed(const Duration(milliseconds: 500), () {
         if(mounted) {
           setState(() => _focusIndex++);
-          if (_isBodyDoubleActive) _tts.speak(_steps[_focusIndex]['text']);
+          if (_isBodyDoubleActive) _speak(_steps[_focusIndex]['text']);
           _stepStopwatch.start(); 
         }
       });
     }
 
     if (_steps.every((s) => s['done'] == true)) {
-       context.read<NeuroSettings>().awardXp(50);
-       _showCompletionCelebration();
-       _stepStopwatch.stop();
+        context.read<NeuroSettings>().awardXp(50);
+        _showCompletionCelebration();
+        _stepStopwatch.stop();
     }
   }
 
@@ -553,7 +589,7 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
                           _isBodyDoubleActive = val;
                           if (val) {
                             _stepStopwatch.start();
-                            if (_steps.isNotEmpty) _tts.speak("I'm monitoring.");
+                            if (_steps.isNotEmpty) _speak("I'm monitoring.");
                           } else {
                             _stepStopwatch.stop();
                             _tts.stop();
@@ -655,7 +691,7 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     );
   }
 
-  // ✅ NEW: Minimalist Stats Header
+  // ✅ Minimalist Stats Header
   Widget _buildXpHeader() {
     final xp = context.watch<NeuroSettings>().xp;
     final level = context.watch<NeuroSettings>().level;
@@ -752,6 +788,9 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     return _buildFocusView();
   }
 
+  // ------------------------------------------------------------------------
+  // 🛠️ FIX 2: UX SCROLL FIX (Centers content, but allows scrolling if small screen)
+  // ------------------------------------------------------------------------
   Widget _buildFocusView() {
     if (_focusIndex >= _steps.length) {
       return Center(
@@ -772,66 +811,85 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     final isDone = step['done'] == true;
     final progress = (_focusIndex + 1) / _steps.length;
 
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          LinearProgressIndicator(
-            value: progress,
-            backgroundColor: Colors.grey.shade200,
-            color: _getProgressColor(progress),
-            minHeight: 8,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          const SizedBox(height: 10),
-          Text("Step ${_focusIndex + 1} of ${_steps.length}", style: TextStyle(color: Colors.grey.shade600)),
-          const Spacer(),
-          Text(
-            step['text'],
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, height: 1.3),
-          ),
-          const SizedBox(height: 20),
-          if (step['seconds'] != null)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.timer, color: Colors.grey, size: 18),
-                const SizedBox(width: 5),
-                Text("${step['seconds']}s estimated", style: const TextStyle(color: Colors.grey)),
-              ],
-            ),
-          const Spacer(),
-          SizedBox(
-            width: double.infinity,
-            height: 70,
-            child: ElevatedButton(
-              onPressed: isDone ? null : () => _completeStep(_focusIndex),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isDone ? Colors.grey : Colors.teal,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    // ✅ FIXED: Using LayoutBuilder + SingleChildScrollView to prevent RenderFlex Overflow
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: IntrinsicHeight(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    LinearProgressIndicator(
+                      value: progress,
+                      backgroundColor: Colors.grey.shade200,
+                      color: _getProgressColor(progress),
+                      minHeight: 8,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    const SizedBox(height: 10),
+                    Text("Step ${_focusIndex + 1} of ${_steps.length}", style: TextStyle(color: Colors.grey.shade600)),
+                    
+                    const SizedBox(height: 40), 
+
+                    Text(
+                      step['text'],
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, height: 1.3),
+                    ),
+                    
+                    const SizedBox(height: 20),
+                    
+                    if (step['seconds'] != null)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.timer, color: Colors.grey, size: 18),
+                          const SizedBox(width: 5),
+                          Text("${step['seconds']}s estimated", style: const TextStyle(color: Colors.grey)),
+                        ],
+                      ),
+                    
+                    const SizedBox(height: 40),
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 70,
+                      child: ElevatedButton(
+                        onPressed: isDone ? null : () => _completeStep(_focusIndex),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isDone ? Colors.grey : Colors.teal,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        ),
+                        child: isDone 
+                          ? const Text("Completed", style: TextStyle(fontSize: 20, color: Colors.white))
+                          : const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                Icon(Icons.check_circle_outline, size: 28, color: Colors.white),
+                                SizedBox(width: 10),
+                                Text("Mark Done", style: TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold)),
+                              ]),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        IconButton(icon: const Icon(Icons.arrow_back), onPressed: _focusIndex > 0 ? () => setState(() => _focusIndex--) : null),
+                        IconButton(icon: const Icon(Icons.arrow_forward), onPressed: _focusIndex < _steps.length - 1 ? () => setState(() => _focusIndex++) : null),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
               ),
-              child: isDone 
-                ? const Text("Completed", style: TextStyle(fontSize: 20, color: Colors.white))
-                : const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Icon(Icons.check_circle_outline, size: 28, color: Colors.white),
-                      SizedBox(width: 10),
-                      Text("Mark Done", style: TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold)),
-                    ]),
             ),
           ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              IconButton(icon: const Icon(Icons.arrow_back), onPressed: _focusIndex > 0 ? () => setState(() => _focusIndex--) : null),
-              IconButton(icon: const Icon(Icons.arrow_forward), onPressed: _focusIndex < _steps.length - 1 ? () => setState(() => _focusIndex++) : null),
-            ],
-          ),
-          const SizedBox(height: 20),
-        ],
-      ),
+        );
+      }
     );
   }
 

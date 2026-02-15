@@ -87,7 +87,7 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
               appBar: AppBar(
                 centerTitle: true,
                 title: const Text(
-                  "Neura",
+                  "Neuro",
                   style: TextStyle(
                     fontWeight: FontWeight.w900,
                     letterSpacing: 1.2,
