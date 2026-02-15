@@ -9,28 +9,14 @@
 
 ---
 
-## Table of Contents
-- [Neuro: The Neurodivergent-First AI Assistant](#neuro-the-neurodivergent-first-ai-assistant)
-  - [Table of Contents](#table-of-contents)
-  - [About The Project](#about-the-project)
-  - [Key Features](#key-features)
-    - [1. Hybrid AI Engine (Cloud + Edge)](#1-hybrid-ai-engine-cloud--edge)
-    - [2. Visual \& Voice Deconstruction](#2-visual--voice-deconstruction)
-    - [3. Neuro-Adaptive Interface](#3-neuro-adaptive-interface)
-    - [4. Dynamic Neuro-Adaptation](#4-dynamic-neuro-adaptation)
-    - [5. Accessibility \& Localization](#5-accessibility--localization)
-    - [6. Zero-Knowledge Privacy](#6-zero-knowledge-privacy)
-  - [🛠 Technical Architecture](#-technical-architecture)
-  - [Installation \& Setup (VS Code)](#installation--setup-vs-code)
-    - [Prerequisites](#prerequisites)
-    - [Steps](#steps)
-  - [Running with Docker (Web + Android Host)](#running-with-docker-web--android-host)
-  - [Installing on Mobile](#installing-on-mobile)
-    - [Connecting a Physical Device (Android)](#connecting-a-physical-device-android)
-    - [Android (APK)](#android-apk)
-    - [iOS (IPA)](#ios-ipa)
-  - [How to Use](#how-to-use)
-  - [🛡️ Privacy \& Security](#️-privacy--security)
+## ## Table of Contents
+- [About The Project](#-about-the-project)
+- [Key Features](#-key-features)
+- [Technical Architecture](#-technical-architecture)
+- [Installation & Setup (VS Code)](#-installation--setup-vs-code)
+- [Mobile Deployment](#-mobile-deployment)
+- [Docker Deployment](#-docker-deployment)
+- [Privacy & Security](#-privacy--security)
 
 ---
 
@@ -82,7 +68,7 @@ The AI creates a psychological profile based on the user's diagnosis:
 
 ---
 
-## 🛠 Technical Architecture
+## Technical Architecture
 
 * **Framework:** Flutter 3.41+ (Dart 3.6+)
 * **State Management:** Provider
@@ -162,12 +148,20 @@ We provide a specialized Docker setup that serves both the **Web Version** of Ne
     * Launch the dual-mode server.
 
 4.  **Access the App**
-    * **🖥️ Web App:** Open `http://localhost:8080` in Chrome.
-    * **📱 Android APK:**
+    * **Web App:** Open `http://localhost:8080` in Chrome.
+    * **Android APK:**
         * **On PC:** Download directly from `http://localhost:8080/neuro.apk`
         * **On Phone:** Connect your phone to the same Wi-Fi as your PC, find your PC's Local IP (e.g., `192.168.1.5`), and visit `http://192.168.1.5:8080/neuro.apk`.
 
 > **Note:** The Web version running in Docker defaults to **Cloud Mode** (API) to ensure stability, as browser-based local LLMs require specific hardware acceleration (WebGPU) that is difficult to virtualize in standard containers.
+> Access the App
+Web Interface: Open http://localhost:8080 in Chrome. Nginx will serve the application automatically.
+
+Download APK: On the web interface, look for an option at the bottom right of the screen to download the APK.
+
+Transfer to Mobile: You can download the APK to your laptop and then transfer it to your mobile device, or access the web server directly from your phone (via your computer's local IP) to download it.
+
+Note: The Web version running in Docker defaults to Cloud Mode (API) to ensure stability, as browser-based local LLMs require specific hardware acceleration.
 ---
 
 ## Installing on Mobile
@@ -208,7 +202,7 @@ To judge the full experience, installing on a physical device is recommended.
 
 ---
 
-## 🛡️ Privacy & Security
+## Privacy & Security
 
 We take safety seriously.
 * **Data Redaction:** Before any text is analyzed, a local algorithm scans for patterns like emails (`[REDACTED_EMAIL]`) and phone numbers to ensure they never reach the cloud.
