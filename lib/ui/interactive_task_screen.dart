@@ -29,7 +29,7 @@ class _InteractiveTaskScreenState extends State<InteractiveTaskScreen> {
   int _currentIndex = 0;
   final FlutterTts _tts = FlutterTts();
 
-  // ✅ SMART BODY DOUBLE (Hidden Logic)
+ 
   bool _isBodyDoubleActive = false;
   Timer? _bodyDoubleMonitor;
   final Stopwatch _stepStopwatch = Stopwatch();
@@ -189,7 +189,7 @@ class _InteractiveTaskScreenState extends State<InteractiveTaskScreen> {
             
             SwitchListTile(
               secondary: const Icon(Icons.people_outline, color: Colors.teal),
-              title: const Text("Body Double"),
+              title: const Text("Buddy"),
               subtitle: const Text("Quietly monitoring time."),
               value: _isBodyDoubleActive,
               activeColor: Colors.teal,

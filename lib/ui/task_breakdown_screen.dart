@@ -542,7 +542,7 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
                     const Divider(),
 
                     SwitchListTile(
-                      title: const Text("Smart Body Double"),
+                      title: const Text("Smart Buddy"),
                       subtitle: Text(_isBodyDoubleActive ? "Adaptive Monitoring On" : "Disabled"),
                       value: _isBodyDoubleActive,
                       activeColor: Colors.teal,

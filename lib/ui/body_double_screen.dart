@@ -217,7 +217,7 @@ class _BodyDoubleScreenState extends State<BodyDoubleScreen> with TickerProvider
       children: [
         Scaffold(
           appBar: AppBar(
-            title: const Text("Body Double"),
+            title: const Text("Buddy"),
             centerTitle: true,
             actions: [
               Padding(

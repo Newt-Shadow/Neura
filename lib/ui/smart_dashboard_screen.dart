@@ -26,7 +26,8 @@ class SmartDashboardScreen extends StatefulWidget {
 }
 
 class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
-  final String _modelUrl = 'https://huggingface.co/google/gemma-3n-E2B-it-litert-preview/resolve/main/gemma-3n-E2B-it-int4.task';
+  final String _modelUrl =
+      'https://huggingface.co/google/gemma-3n-E2B-it-litert-preview/resolve/main/gemma-3n-E2B-it-int4.task';
   final String _filename = 'gemma-3n-E2B-it-int4.task';
 
   int _selectedIndex = 0;
@@ -35,20 +36,25 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _confettiController = ConfettiController(duration: const Duration(seconds: 3));
+    _confettiController = ConfettiController(
+      duration: const Duration(seconds: 3),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) => _autoLoadModel());
-    
+
     context.read<NeuroSettings>().addListener(() {
       if (context.read<NeuroSettings>().showLevelUpAnimation && mounted) {
         _confettiController.play();
         context.read<NeuroSettings>().consumeLevelUpEvent();
         ScaffoldMessenger.of(context).showSnackBar(
-           const SnackBar(content: Text("🎉 LEVEL UP! You are amazing! 🎉"), backgroundColor: Colors.purple),
+          const SnackBar(
+            content: Text("🎉 LEVEL UP! You are amazing! 🎉"),
+            backgroundColor: Colors.purple,
+          ),
         );
       }
     });
   }
-  
+
   @override
   void dispose() {
     _confettiController.dispose();
@@ -58,7 +64,9 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
   Future<void> _autoLoadModel() async {
     final settings = context.read<NeuroSettings>();
     if (!settings.useLocalModel || ModelHolder.isModelLoaded) return;
-    final downloader = GemmaDownloaderDataSource(model: DownloadModel(modelUrl: _modelUrl, modelFilename: _filename));
+    final downloader = GemmaDownloaderDataSource(
+      model: DownloadModel(modelUrl: _modelUrl, modelFilename: _filename),
+    );
     await downloader.checkModelExistence();
   }
 
@@ -67,7 +75,7 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
     return Consumer<NeuroSettings>(
       builder: (context, settings, child) {
         final isGuest = settings.currentUser == null;
-        
+
         final List<Widget> screens = [
           _buildZenDashboard(settings),
           const NeuroProfileScreen(),
@@ -78,20 +86,36 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
             Scaffold(
               appBar: AppBar(
                 centerTitle: true,
-                title: const Text("Neura", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                title: const Text(
+                  "Neura",
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                  ),
+                ),
                 leading: IconButton(
-                  icon: const Icon(Icons.health_and_safety, color: Colors.pinkAccent),
+                  icon: const Icon(
+                    Icons.health_and_safety,
+                    color: Colors.pinkAccent,
+                  ),
                   tooltip: "Panic Mode",
-                  onPressed: () => Navigator.push(context, PageRouteBuilder(
-                    pageBuilder: (_, __, ___) => const PanicModeScreen(),
-                    transitionsBuilder: (_, a, __, c) => FadeTransition(opacity: a, child: c),
-                  )),
+                  onPressed: () => Navigator.push(
+                    context,
+                    PageRouteBuilder(
+                      pageBuilder: (_, __, ___) => const PanicModeScreen(),
+                      transitionsBuilder: (_, a, __, c) =>
+                          FadeTransition(opacity: a, child: c),
+                    ),
+                  ),
                 ),
                 actions: [
                   if (isGuest)
                     IconButton(
                       icon: const Icon(Icons.login, color: Colors.teal),
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SignInScreen())),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const SignInScreen()),
+                      ),
                     )
                   else
                     Padding(
@@ -101,8 +125,13 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
                         child: CircleAvatar(
                           radius: 18,
                           backgroundColor: Colors.teal.shade100,
-                          backgroundImage: settings.currentUser?.photoURL != null ? NetworkImage(settings.currentUser!.photoURL!) : null,
-                          child: settings.currentUser?.photoURL == null ? const Icon(Icons.person, color: Colors.teal) : null,
+                          backgroundImage:
+                              settings.currentUser?.photoURL != null
+                              ? NetworkImage(settings.currentUser!.photoURL!)
+                              : null,
+                          child: settings.currentUser?.photoURL == null
+                              ? const Icon(Icons.person, color: Colors.teal)
+                              : null,
                         ),
                       ),
                     ),
@@ -113,21 +142,33 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
 
               bottomNavigationBar: NavigationBar(
                 selectedIndex: _selectedIndex,
-                onDestinationSelected: (i) => setState(() => _selectedIndex = i),
+                onDestinationSelected: (i) =>
+                    setState(() => _selectedIndex = i),
                 destinations: const [
-                  NavigationDestination(icon: Icon(Icons.grid_view_rounded), label: "Dashboard"),
-                  NavigationDestination(icon: Icon(Icons.person_outline_rounded), label: "Profile"),
+                  NavigationDestination(
+                    icon: Icon(Icons.grid_view_rounded),
+                    label: "Dashboard",
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.person_outline_rounded),
+                    label: "Profile",
+                  ),
                 ],
               ),
             ),
-            
+
             Align(
               alignment: Alignment.topCenter,
               child: ConfettiWidget(
                 confettiController: _confettiController,
                 blastDirectionality: BlastDirectionality.explosive,
                 shouldLoop: false,
-                colors: const [Colors.teal, Colors.purple, Colors.amber, Colors.pink], 
+                colors: const [
+                  Colors.teal,
+                  Colors.purple,
+                  Colors.amber,
+                  Colors.pink,
+                ],
               ),
             ),
           ],
@@ -151,29 +192,31 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
           // ✅ 1. XP Bar
           _buildXpBar(settings),
           const SizedBox(height: 20),
-          
+
           // ✅ 2. Status Chips (Star Added)
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
                 _StatusChip(
-                  icon: Icons.star, 
-                  color: Colors.amber, 
+                  icon: Icons.star,
+                  color: Colors.amber,
                   label: "Lvl ${settings.level}",
-                  onTap: () {}, 
+                  onTap: () {},
                 ),
                 const SizedBox(width: 10),
                 _StatusChip(
-                  icon: Icons.local_fire_department, 
-                  color: Colors.orange, 
+                  icon: Icons.local_fire_department,
+                  color: Colors.orange,
                   label: "${settings.streakCount} Day Streak",
                   onTap: () {},
                 ),
                 const SizedBox(width: 10),
                 _StatusChip(
-                  icon: settings.isOverwhelmed ? Icons.battery_alert : _getBatteryIcon(settings.energyLevel), 
-                  color: _getBatteryColor(settings.energyLevel), 
+                  icon: settings.isOverwhelmed
+                      ? Icons.battery_alert
+                      : _getBatteryIcon(settings.energyLevel),
+                  color: _getBatteryColor(settings.energyLevel),
                   label: "${(settings.energyLevel * 100).toInt()}% Energy",
                   isOutline: true,
                   onTap: () => _showBrainStateMenu(context, settings),
@@ -181,9 +224,9 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
               ],
             ),
           ),
-          
+
           const SizedBox(height: 32),
-          
+
           // ✅ 3. Full Width Cards
           _HeroCard(
             title: "Task Assistant",
@@ -194,43 +237,67 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
             isHighContrast: settings.highContrast,
             onTap: () {
               if (settings.useLocalModel && !ModelHolder.isModelLoaded) {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const ModelSetupScreen()));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ModelSetupScreen()),
+                );
               } else {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const TaskBreakdownScreen()));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const TaskBreakdownScreen(),
+                  ),
+                );
               }
             },
           ),
           const SizedBox(height: 16),
 
           _HeroCard(
-            title: "Body Double",
+            title: "Buddy",
             subtitle: "Stay focused. I'll watch the time.",
             icon: Icons.support_agent,
             color: Colors.purple.shade50,
             iconColor: Colors.purple,
             isHighContrast: settings.highContrast,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BodyDoubleScreen())),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const BodyDoubleScreen()),
+            ),
           ),
           const SizedBox(height: 16),
 
           // ✅ 4. AI Brain (Now Full Width)
           _HeroCard(
             title: "AI Brain Manager",
-            subtitle: ModelHolder.isModelLoaded ? "Active: Ready to think offline." : "Offline Mode: Tap to setup.",
+            subtitle: ModelHolder.isModelLoaded
+                ? "Active: Ready to think offline."
+                : "Offline Mode: Tap to setup.",
             icon: Icons.psychology,
             color: Colors.blue.shade50,
             iconColor: Colors.blue,
             isHighContrast: settings.highContrast,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ModelSetupScreen())),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ModelSetupScreen()),
+            ),
           ),
-          
-          if (dotenv.env['ADMIN_EMAIL'] == settings.currentUser?.email) ...[
+
+          if (settings.currentUser != null &&
+              settings.currentUser!.email != null &&
+              dotenv.env['ADMIN_EMAIL'] != null &&
+              settings.currentUser!.email == dotenv.env['ADMIN_EMAIL']) ...[
             const SizedBox(height: 24),
-            Center(child: TextButton.icon(
-              icon: const Icon(Icons.terminal, size: 16),
-              label: const Text("Admin Logs"),
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DebugLogScreen())),
-            ))
+            Center(
+              child: TextButton.icon(
+                icon: const Icon(Icons.terminal, size: 16),
+                label: const Text("Admin Logs"),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const DebugLogScreen()),
+                ),
+              ),
+            ),
           ],
           const SizedBox(height: 40),
         ],
@@ -245,8 +312,17 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text("Level ${settings.level}", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
-            Text("${settings.xp} / ${settings.xpToNextLevel} XP", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+            Text(
+              "Level ${settings.level}",
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.teal,
+              ),
+            ),
+            Text(
+              "${settings.xp} / ${settings.xpToNextLevel} XP",
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
+            ),
           ],
         ),
         const SizedBox(height: 6),
@@ -280,7 +356,9 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
   void _showBrainStateMenu(BuildContext context, NeuroSettings settings) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (ctx) {
         return SafeArea(
           child: Padding(
@@ -288,12 +366,17 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text("Brain Battery Check 🔋", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                const Text(
+                  "Brain Battery Check 🔋",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 20),
                 const Text("How much energy do you have?"),
                 Slider(
                   value: settings.energyLevel,
-                  min: 0.0, max: 1.0, divisions: 5,
+                  min: 0.0,
+                  max: 1.0,
+                  divisions: 5,
                   activeColor: _getBatteryColor(settings.energyLevel),
                   label: "${(settings.energyLevel * 100).toInt()}%",
                   onChanged: (val) => settings.setEnergy(val),
@@ -324,7 +407,13 @@ class _StatusChip extends StatelessWidget {
   final bool isOutline;
   final VoidCallback onTap;
 
-  const _StatusChip({required this.icon, required this.color, required this.label, required this.onTap, this.isOutline = false});
+  const _StatusChip({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.onTap,
+    this.isOutline = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -341,7 +430,14 @@ class _StatusChip extends StatelessWidget {
           children: [
             Icon(icon, size: 18, color: color),
             const SizedBox(width: 6),
-            Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: color.withOpacity(0.9), fontSize: 13)),
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: color.withOpacity(0.9),
+                fontSize: 13,
+              ),
+            ),
           ],
         ),
       ),
@@ -357,28 +453,48 @@ class _HeroCard extends StatelessWidget {
   final Color iconColor;
   final VoidCallback onTap;
   final bool isHighContrast;
-  final double? height; 
+  final double? height;
 
   const _HeroCard({
-    required this.title, required this.subtitle, required this.icon, required this.color, required this.iconColor, required this.onTap,
-    this.isHighContrast = false, this.height,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.iconColor,
+    required this.onTap,
+    this.isHighContrast = false,
+    this.height,
   });
 
   @override
   Widget build(BuildContext context) {
     final finalBg = isHighContrast ? Colors.white : color;
     final finalIcon = isHighContrast ? Colors.black : iconColor;
-    final border = isHighContrast ? Border.all(color: Colors.black, width: 3) : null;
-    final titleStyle = TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isHighContrast ? Colors.black : Colors.black87);
+    final border = isHighContrast
+        ? Border.all(color: Colors.black, width: 3)
+        : null;
+    final titleStyle = TextStyle(
+      fontSize: 20,
+      fontWeight: FontWeight.bold,
+      color: isHighContrast ? Colors.black : Colors.black87,
+    );
 
     return Container(
-      height: height, 
-      constraints: const BoxConstraints(minHeight: 120), 
+      height: height,
+      constraints: const BoxConstraints(minHeight: 120),
       decoration: BoxDecoration(
         color: finalBg,
         borderRadius: BorderRadius.circular(24),
         border: border,
-        boxShadow: isHighContrast ? [] : [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: isHighContrast
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
       ),
       child: Material(
         color: Colors.transparent,
@@ -395,21 +511,40 @@ class _HeroCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min, 
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Flexible( 
-                        child: Text(title, style: titleStyle, overflow: TextOverflow.ellipsis),
+                      Flexible(
+                        child: Text(
+                          title,
+                          style: titleStyle,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                       if (subtitle.isNotEmpty) ...[
                         const SizedBox(height: 4),
-                        Flexible( 
-                          child: Text(subtitle, style: TextStyle(fontSize: 13, color: isHighContrast ? Colors.black : Colors.black54, height: 1.2), maxLines: 3, overflow: TextOverflow.ellipsis),
-                        )
-                      ]
+                        Flexible(
+                          child: Text(
+                            subtitle,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isHighContrast
+                                  ? Colors.black
+                                  : Colors.black54,
+                              height: 1.2,
+                            ),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
-                Icon(Icons.arrow_forward_ios, size: 14, color: isHighContrast ? Colors.black : Colors.black26),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 14,
+                  color: isHighContrast ? Colors.black : Colors.black26,
+                ),
               ],
             ),
           ),
