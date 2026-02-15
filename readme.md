@@ -161,7 +161,7 @@ Download APK: On the web interface, look for an option at the bottom right of th
 
 Transfer to Mobile: You can download the APK to your laptop and then transfer it to your mobile device, or access the web server directly from your phone (via your computer's local IP) to download it.
 
-Note: The Web version running in Docker defaults to Cloud Mode (API) to ensure stability, as browser-based local LLMs require specific hardware acceleration.
+
 ---
 
 ## Installing on Mobile
