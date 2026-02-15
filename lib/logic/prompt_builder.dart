@@ -76,9 +76,9 @@ STEP COUNT PROTOCOL:
 Calculate 'Target Step Count' based on these factors:
 
 [TASK COMPLEXITY]
-- Simple (e.g., "Drink water", "Put on shoes") -> 3-5 steps.
-- Medium (e.g., "Clear desk", "Pack bag") -> 5-8 steps.
-- Complex (e.g., "Clean room", "Cook dinner") -> 7-16 steps.
+- Simple (e.g., "Drink water", "Put on shoes") -> 5-7 steps.
+- Medium (e.g., "Clear desk", "Pack bag") -> 7-10 steps.
+- Complex (e.g., "Clean room", "Cook dinner") -> 10-17 steps.
 
 - OVERWHELM HANDLING:
   * If Overwhelmed=true: Generate the FULL plan internally, but OUTPUT ONLY the first 3 steps. Add a "Continue" option.
@@ -141,7 +141,7 @@ AUTISM MODE:
     }
 
     // --- DYSLEXIA ---
-    if (diagnosis.contains("DYSLEXI") || diagnosis.contains("DYSLEX") || diagnosis.contains("DISLEX") || diagnosis.contains("READING")) {
+    if (diagnosis.contains("DYSLEXIC") || diagnosis.contains("DYSLEXIA") || diagnosis.contains("DYSLEX") || diagnosis.contains("DISLEX") || diagnosis.contains("READING")) {
       buffer.writeln("""
 DYSLEXIA MODE:
 - FORMAT: Use bullet points strictly.
