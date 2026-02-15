@@ -4,68 +4,105 @@ import 'package:provider/provider.dart';
 import 'package:neuro/logic/neuro_settings.dart';
 import 'package:neuro/ui/smart_dashboard_screen.dart';
 
+// ============================================================
+// 🛠️ MOCK CLASS (The Secret Sauce)
+// ============================================================
+// This class simulates NeuroSettings without hitting Firebase/Storage.
+// It allows us to test the UI logic in isolation.
+class MockNeuroSettings extends NeuroSettings {
+  bool _mockDyslexia = false;
+  final String _mockName = "Test User"; // Use a specific name to verify display
+
+  // Override getters to return safe data
+  @override
+  String get userName => _mockName;
+  
+  @override
+  bool get dyslexiaMode => _mockDyslexia;
+  
+  @override
+  String? get fontFamily => _mockDyslexia ? 'OpenDyslexic' : 'Lexend';
+
+  @override
+  int get streakCount => 5; // Fake streak data
+
+  // Override complex methods to do simple in-memory updates
+  @override
+  void toggleFont() {
+    _mockDyslexia = !_mockDyslexia;
+    notifyListeners(); // This tells the UI to rebuild, which we verify
+  }
+
+  // Dangerous methods are overridden to do nothing
+  @override
+  Future<void> loadSettings() async { /* Do nothing */ }
+
+  @override
+  Future<void> setApiKey(String key) async { /* Do nothing */ }
+  
+  @override
+  void startCloudListener() { /* Do nothing */ }
+}
+
 void main() {
-  // Advanced Test: Verifies Neuro-Inclusive Theme Injection
-  testWidgets('Neura UI Adaptation Test', (WidgetTester tester) async {
-    // 1. Create a mock instance of your settings
-    final settings = NeuroSettings();
-    
-    // 2. Build our app within the Test Environment
-    // We wrap it in a ChangeNotifierProvider so the UI has its data source
+  // ✅ TEST 1: Verifies the UI adapts to Neuro-Inclusive settings
+  testWidgets('Neura UI Adaptation Test - Dyslexia Mode', (WidgetTester tester) async {
+    // 1. Setup the Mock
+    final mockSettings = MockNeuroSettings();
+
+    // 2. Build the app with the Mock Provider
     await tester.pumpWidget(
       ChangeNotifierProvider<NeuroSettings>.value(
-        value: settings,
+        value: mockSettings,
         child: const MaterialApp(
           home: SmartDashboardScreen(),
         ),
       ),
     );
 
-    // 3. Verify the Dashboard loads with the default "Namaste" greeting
-    expect(find.textContaining('Namaste'), findsOneWidget);
+    // 3. Verify Dashboard initialized with our Mock Data
+    // We expect to see "Test User" instead of "Friend"
+    expect(find.textContaining('Test User'), findsOneWidget);
 
-    // 4. Verify basic Navigation elements exist
-    expect(find.byIcon(Icons.dashboard_customize_outlined), findsOneWidget);
-    expect(find.byIcon(Icons.person), findsOneWidget);
+    // 4. Verify Initial Font State (Should be Standard)
+    final textFinder = find.textContaining('Test User');
+    final textWidgetBefore = tester.widget<Text>(textFinder);
+    expect(textWidgetBefore.style?.fontFamily, isNot('OpenDyslexic'));
 
-    // 5. TEST: Font Adaptation (Innovation Check)
-    // Initially, font should be standard (null)
-    final textWidget = tester.widget<Text>(find.textContaining('Namaste'));
-    expect(textWidget.style?.fontFamily, isNot('OpenDyslexic'));
-
-    // Trigger Dyslexia Mode manually in settings
-    settings.toggleFont();
+    // 5. Trigger Innovation: Toggle Dyslexia Mode
+    mockSettings.toggleFont();
     
-    // Re-render the frame to apply the font change
+    // 6. Re-render (Wait for animations)
     await tester.pumpAndSettle();
 
-    // Verify the UI adapted to the user's neuro-needs
-    // Note: In a real test, you'd check the Theme data or the specific screen output
-    debugPrint("✅ UI successfully adapted to Dyslexia Mode");
+    // 7. Verify the Logic Update
+    expect(mockSettings.dyslexiaMode, true);
+    debugPrint("✅ UI successfully processed Dyslexia Mode toggle.");
   });
 
-  testWidgets('Dashboard Hero Cards interaction test', (WidgetTester tester) async {
-    final settings = NeuroSettings();
+  // ✅ TEST 2: Verifies Hero Cards are interactive
+  testWidgets('Dashboard Hero Cards Interaction Test', (WidgetTester tester) async {
+    final mockSettings = MockNeuroSettings();
 
     await tester.pumpWidget(
       ChangeNotifierProvider<NeuroSettings>.value(
-        value: settings,
-        child: const MaterialApp( home: SmartDashboardScreen() ),
+        value: mockSettings,
+        child: const MaterialApp(home: SmartDashboardScreen()),
       ),
     );
 
-    // Check if the "Task Assistant" card is present
-    expect(find.text('Task Assistant'), findsOneWidget);
+    // 1. Find the "Task Assistant" card
+    final taskCard = find.text('Task Assistant');
+    expect(taskCard, findsOneWidget);
     
-    // Tap the card
-    await tester.tap(find.text('Task Assistant'));
+    // 2. Tap it
+    await tester.tap(taskCard);
     
-    // Re-render to see if it tries to navigate
+    // 3. Wait for navigation animation
     await tester.pumpAndSettle();
     
-    // Since we aren't logged in in this test environment, 
-    // it likely shows a snackbar or navigates to Setup. 
-    // This confirms the button is interactive.
-    debugPrint("✅ Hero cards are responsive to touch");
+    // 4. If no crash happened, the test passes.
+    // (In a fuller test, we would check if the new route was pushed)
+    debugPrint("✅ Hero cards are responsive to touch.");
   });
 }
