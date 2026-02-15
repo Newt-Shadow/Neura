@@ -9,7 +9,7 @@
 
 ---
 
-## ## Table of Contents
+## 📖 Table of Contents
 - [About The Project](#-about-the-project)
 - [Key Features](#-key-features)
 - [Technical Architecture](#-technical-architecture)
@@ -20,7 +20,7 @@
 
 ---
 
-## About The Project
+## 💡 About The Project
 
 **Neuro** is not just another to-do list; it is an **Executive Function Prosthesis**.
 
@@ -35,7 +35,7 @@ Unlike standard to-do lists, Neuro bridges this gap using a **Hybrid AI Approach
 
 ---
 
-## Key Features
+## 🌟 Key Features
 
 ### 1. Hybrid AI Engine (Cloud + Edge)
 * **Cloud Mode:** Uses Google Gemini Pro for complex reasoning and high-speed planning.
@@ -56,10 +56,9 @@ The AI creates a psychological profile based on the user's diagnosis:
 * **Autism:** Instructions are literal, logical, and sensory-aware.
 * **Dyslexia:** Text is formatted with bullet points, high-contrast fonts (OpenDyslexic), and emojis.
 * **Anxiety:** Tone is grounding, reassuring, and focuses on "Micro-Wins."
-  
+
 ### 5. Accessibility & Localization
 * **Dyslexia Support:** Includes the `OpenDyslexic` font and high-contrast modes.
-* **Multi-Language:** Native support for **English, Italian, Hindi, French, Spanish, and German**.
 * **Panic Mode:** A grounding interface designed to reduce anxiety in real-time.
 
 ### 6. Zero-Knowledge Privacy
@@ -68,7 +67,7 @@ The AI creates a psychological profile based on the user's diagnosis:
 
 ---
 
-## Technical Architecture
+## 🛠 Technical Architecture
 
 * **Framework:** Flutter 3.41+ (Dart 3.6+)
 * **State Management:** Provider
@@ -79,7 +78,7 @@ The AI creates a psychological profile based on the user's diagnosis:
 
 ---
 
-## Installation & Setup (VS Code)
+## 💻 Installation & Setup (VS Code)
 
 Follow these steps to run the source code on your local machine.
 
@@ -88,7 +87,7 @@ Follow these steps to run the source code on your local machine.
 2.  **VS Code:** With the "Flutter" and "Dart" extensions installed.
 3.  **Android Studio / Xcode:** For emulators or physical device drivers.
 4.  **Gemini API Key:** Get one from [Google AI Studio](https://aistudio.google.com/).
-5.  **Docker :** Required if you want to run the containerized Web Server or host the APK locally.
+5.  **Docker:** Required if you want to run the containerized Web Server or host the APK locally.
 
 ### Steps
 
@@ -126,7 +125,7 @@ Follow these steps to run the source code on your local machine.
 
 ---
 
-## Running with Docker (Web + Android Host)
+## 🐳 Docker Deployment (Web + Android Host)
 
 We provide a specialized Docker setup that serves both the **Web Version** of Neuro and hosts the **Android APK** for easy download to your mobile device.
 
@@ -142,34 +141,23 @@ We provide a specialized Docker setup that serves both the **Web Version** of Ne
     ```
 
 3.  **Interactive Launch Menu**
-    The container will launch a terminal menu allowing you to:
-    * Review Beta warnings.
-    * Understand Web vs. Mobile limitations (e.g., No Offline AI on Web).
-    * Launch the dual-mode server.
+    The container will launch a terminal menu allowing you to review Beta warnings and launch the dual-mode server.
 
 4.  **Access the App**
-    * **Web App:** Open `http://localhost:8080` in Chrome.
-    * **Android APK:**
-        * **On PC:** Download directly from `http://localhost:8080/neuro.apk`
-        * **On Phone:** Connect your phone to the same Wi-Fi as your PC, find your PC's Local IP (e.g., `192.168.1.5`), and visit `http://192.168.1.5:8080/neuro.apk`.
+    * **Web Interface:** Open `http://localhost:8080` in Chrome. Nginx will serve the application automatically.
+    * **Download APK:** On the web interface, look for an option at the **bottom right** of the screen to download the APK.
+    * **Transfer to Mobile:** You can download the APK to your laptop and then transfer it to your mobile device, or access the web server directly from your phone (via your computer's local IP) to download it.
 
-> **Note:** The Web version running in Docker defaults to **Cloud Mode** (API) to ensure stability, as browser-based local LLMs require specific hardware acceleration (WebGPU) that is difficult to virtualize in standard containers.
-> Access the App
-Web Interface: Open http://localhost:8080 in Chrome. Nginx will serve the application automatically.
-
-Download APK: On the web interface, look for an option at the bottom right of the screen to download the APK.
-
-Transfer to Mobile: You can download the APK to your laptop and then transfer it to your mobile device, or access the web server directly from your phone (via your computer's local IP) to download it.
-
+> **Note:** The Web version running in Docker defaults to **Cloud Mode** (API) to ensure stability, as browser-based local LLMs require specific hardware acceleration.
 
 ---
 
-## Installing on Mobile
+## 📱 Installing on Mobile
 
 To judge the full experience, installing on a physical device is recommended.
 
 ### Connecting a Physical Device (Android)
-1.  **Enable Developer Options:** Go to Settings > About Phone > Tap "Build Number" 5 times.
+1.  **Enable Developer Options:** Go to Settings > About Phone > Tap "Build Number" 7 times.
 2.  **Enable USB Debugging:** Go to Settings > System > Developer Options > Enable "USB Debugging".
 3.  **Connect:** Plug your phone into your PC via USB.
 4.  **Verify:** Run `flutter devices` in your terminal to ensure your phone is recognized.
@@ -191,7 +179,7 @@ To judge the full experience, installing on a physical device is recommended.
 
 ---
 
-## How to Use
+## 🎮 How to Use
 
 1.  **Onboarding:** Create a profile. Be honest about your neuro-type (e.g., "ADHD", "Anxiety"). This tunes the AI's personality.
 2.  **The Dashboard:**
@@ -202,11 +190,11 @@ To judge the full experience, installing on a physical device is recommended.
 
 ---
 
-## Privacy & Security
+## 🛡️ Privacy & Security
 
 We take safety seriously.
 * **Data Redaction:** Before any text is analyzed, a local algorithm scans for patterns like emails (`[REDACTED_EMAIL]`) and phone numbers to ensure they never reach the cloud.
-* **Secure Storage:** Chat logs and images are encrypted with AES-256 before being stored. When synced to the cloud for backup, they are encrypted with a key that **are stored in the device's hardware-backed Keystore (Android) or Keychain (iOS).**. We cannot read your chats.
+* **Secure Storage:** Chat logs and images are encrypted with AES-256 before being stored. When synced to the cloud for backup, they are encrypted with a key that **is stored in the device's hardware-backed Keystore (Android) or Keychain (iOS)**. We cannot read your chats.
 
 ---
 
