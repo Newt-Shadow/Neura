@@ -13,6 +13,7 @@ import 'package:uuid/uuid.dart';
 import 'package:confetti/confetti.dart'; 
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_tts/flutter_tts.dart'; 
+import 'package:audioplayers/audioplayers.dart';
 
 import '../logic/task_classifier.dart'; 
 import '../logic/advanced_logger.dart'; 
@@ -37,6 +38,7 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
   // 🔀 TOGGLE STATE
   bool _isGamifiedMode = false; 
   bool _isBodyDoubleActive = true;
+  final AudioPlayer _musicPlayer = AudioPlayer();
 
   bool _forceTextMode = false;
   final ImagePicker _picker = ImagePicker();
@@ -71,6 +73,11 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
   final List<double> _paceHistory = [];
   double _currentPaceFactor = 1.0; 
 
+  // 🎓 DYNAMIC STUDY MODE STATE (NEW)
+  bool _isFocusAudioPlaying = false;
+  String _currentFocusAudio = "Brown Noise"; // ADHD Favorite
+  bool _isPodcastLoading = false;
+
   @override
   void initState() {
     super.initState();
@@ -79,11 +86,8 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     _startSmartBodyDouble(); 
   }
 
-  // ------------------------------------------------------------------------
-  // 🔊 FIX 1: Corrected TTS Logic & Audio Setup
-  // ------------------------------------------------------------------------
   Future<void> _initTts() async {
-    // UX FIX: Allow audio to mix with others and play even if silent switch is on (iOS)
+    // UX FIX: Allow audio to mix with others
     await _tts.setIosAudioCategory(IosTextToSpeechAudioCategory.playback, [
       IosTextToSpeechAudioCategoryOptions.allowBluetooth,
       IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
@@ -97,21 +101,15 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
 
   Future<void> _speak(String text) async {
     if (text.isEmpty) return;
-
     try {
       final settings = context.read<NeuroSettings>();
-      
-      // 1. Get the language String from settings (e.g. "Italiano", "Hindi")
-      // In NeuroSettings, 'preferredLanguage' returns a String, not an object.
       final String selectedLangName = settings.preferredLanguage.toLowerCase();
-
-      // 2. Map the name to a TTS Locale Code
-      String locale = "en-US"; // Default
+      String locale = "en-US"; 
 
       if (selectedLangName.contains("italiano")) {
         locale = "it-IT";
       } else if (selectedLangName.contains("hindi")) {
-        locale = "hi-IN"; // Handles Hinglish well
+        locale = "hi-IN"; 
       } else if (selectedLangName.contains("español") || selectedLangName.contains("spanish")) {
         locale = "es-ES";
       } else if (selectedLangName.contains("deutsch") || selectedLangName.contains("german")) {
@@ -120,12 +118,10 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
         locale = "fr-FR";
       }
 
-      // 3. Apply and Speak
       await _tts.setLanguage(locale);
       await _tts.speak(text);
     } catch (e) {
       debugPrint("TTS Error: $e");
-      // Fallback if something fails
       await _tts.setLanguage("en-US");
       await _tts.speak(text);
     }
@@ -133,6 +129,7 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
 
   @override
   void dispose() {
+    _musicPlayer.dispose();
     _textController.dispose();
     _confettiController.dispose();
     _tts.stop();
@@ -141,66 +138,46 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     super.dispose();
   }
 
-  // 🧠 SMART LOOP: Uses Context-Aware Logic
+  // 🧠 SMART LOOP
   void _startSmartBodyDouble() {
     _bodyDoubleMonitor = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (!_isBodyDoubleActive || _steps.isEmpty || _isLoading || _focusIndex >= _steps.length) return;
 
       final currentStep = _steps[_focusIndex];
       final int baseEstimate = currentStep['seconds'] ?? 45;
-      
-      // Dynamic Adjustment based on user's current flow state
       final double adjustedLimit = baseEstimate * _currentPaceFactor;
       final int elapsed = _stepStopwatch.elapsed.inSeconds;
 
       if (_interventionLevel == 0 && elapsed > (adjustedLimit * 1.5)) {
-        _triggerIntervention(1); // Mild
+        _triggerIntervention(1); 
       } else if (_interventionLevel == 1 && elapsed > (adjustedLimit * 2.5)) {
-        _triggerIntervention(2); // Tactical
+        _triggerIntervention(2); 
       } else if (_interventionLevel == 2 && elapsed > (adjustedLimit * 4.0)) {
-        _triggerIntervention(3); // Permission
+        _triggerIntervention(3); 
       }
     });
   }
 
   void _triggerIntervention(int level) async {
     setState(() => _interventionLevel = level);
-    
-    // Get current step to generate specific advice
     final currentStep = _steps[_focusIndex];
     String msg = _getSmartBodyDoubleMessage(level, currentStep);
-
     await _speak(msg);
-
     if (mounted) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Row(
-            children: [
-              Icon(
-                level == 3 ? Icons.skip_next : Icons.support_agent, 
-                color: Colors.white
-              ),
-              const SizedBox(width: 12),
-              Expanded(child: Text(msg, style: const TextStyle(fontSize: 14))),
-            ],
-          ),
+          content: Row(children: [const Icon(Icons.support_agent, color: Colors.white), const SizedBox(width: 10), Expanded(child: Text(msg))]),
           backgroundColor: Colors.grey.shade900,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: const EdgeInsets.all(16),
           duration: const Duration(seconds: 6),
-          action: level == 3 
-            ? SnackBarAction(label: "Skip", textColor: Colors.tealAccent, onPressed: () => _completeStep(_focusIndex))
-            : null,
+          action: level == 3 ? SnackBarAction(label: "Skip", textColor: Colors.tealAccent, onPressed: () => _completeStep(_focusIndex)) : null,
         ),
       );
     }
   }
 
   String _getSmartBodyDoubleMessage(int level, Map<String, dynamic> step) {
-    // 1. INPUT ANALYSIS
     final text = step['text'].toString();
     final seconds = step['seconds'] as int? ?? 60;
     final settings = context.read<NeuroSettings>();
@@ -211,89 +188,259 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     final bool isLowEnergy = settings.energyLevel < 0.4;
     final bool isOverwhelmed = settings.isOverwhelmed;
     final bool isHighEnergy = settings.energyLevel > 0.8;
-
     final bool isQuick = seconds <= 45;
     final bool isLong = seconds >= 120;
 
-    // --- PRIORITY 0: PANIC INTERVENTION (Override everything if overwhelmed) ---
     if (isOverwhelmed) {
       if (level == 1) return "I know it feels loud right now. Just breathe. I am holding the space for you.";
       if (level == 2) return "Forget the outcome. Just do the smallest, tiniest part of '$subject'.";
       return "This is too much for right now. Let's skip it and protect your peace.";
     }
 
-    // --- LEVEL 1: MAINTENANCE (The Gentle Nudge) ---
     if (level == 1) {
       if (isHighEnergy && type == TaskType.physical) {
-        return _random([
-          "You've got momentum! Crush this ${isQuick ? 'quick ' : ''}step.",
-          "Keep that energy up. $subject is almost done.",
-          "Speed run mode: Let's finish this in 20 seconds."
-        ]);
+        return _random(["You've got momentum! Crush this ${isQuick ? 'quick ' : ''}step.", "Keep that energy up. $subject is almost done.", "Speed run mode: Let's finish this in 20 seconds."]);
       }
-      
       if (isLowEnergy) {
-        return _random([
-          "I know energy is low. We are moving slowly, and that is okay.",
-          "Gentle focus. Just look at the $subject.",
-          "No rush. One breath, one movement."
-        ]);
+        return _random(["I know energy is low. We are moving slowly, and that is okay.", "Gentle focus. Just look at the $subject.", "No rush. One breath, one movement."]);
       }
-
-      // Context-Specific Nudges
       switch (type) {
-        case TaskType.social:
-          return "Social tasks drain battery. Draft it now, send it later.";
-        case TaskType.cognitive:
-          return "If the brain fog is creeping in, just read the first sentence.";
-        case TaskType.physical:
-          return "Action creates motivation. Just move your hands towards the $subject.";
-        default:
-          return "I'm still here. We are focusing on: $text.";
+        case TaskType.social: return "Social tasks drain battery. Draft it now, send it later.";
+        case TaskType.cognitive: return "If the brain fog is creeping in, just read the first sentence.";
+        case TaskType.physical: return "Action creates motivation. Just move your hands towards the $subject.";
+        default: return "I'm still here. We are focusing on: $text.";
       }
     }
 
-    // --- LEVEL 2: UNBLOCKING (The Tactical Coach) ---
     if (level == 2) {
-      // Strategy: "Novelty" for ADHD
-      if (type == TaskType.physical) {
-        return _random([
-          "Let's make it weird. Try doing this step standing on one leg.",
-          "Can you do this step with your non-dominant hand? Engage the brain.",
-          "Don't 'clean' the $subject. Just touch it. That counts."
-        ]);
-      }
-
-      // Strategy: "Binary Choice" for Decision Fatigue
-      if (type == TaskType.cognitive) {
-        return _random([
-          "Analysis paralysis? Pick the FIRST option you see. We can fix it later.",
-          "Don't try to be perfect. Be messy. Messy is progress.",
-          "Your brain is resisting. Trick it: Do only 10% of the work."
-        ]);
-      }
-
-      // Strategy: "Body Doubling" for Anxiety
-      if (type == TaskType.social) {
-        return "I'm right here. Write the 'ugly draft'. No one has to see it yet.";
-      }
-      
+      if (type == TaskType.physical) return _random(["Let's make it weird. Try doing this step standing on one leg.", "Can you do this step with your non-dominant hand?", "Don't 'clean' the $subject. Just touch it."]);
+      if (type == TaskType.cognitive) return _random(["Analysis paralysis? Pick the FIRST option you see.", "Don't try to be perfect. Be messy.", "Your brain is resisting. Trick it: Do only 10%."]);
+      if (type == TaskType.social) return "I'm right here. Write the 'ugly draft'. No one has to see it yet.";
       return "We are stuck. Let's reset: Stand up, shake your arms, sit back down.";
     }
 
-    // --- LEVEL 3: SALVAGE (Permission & Compassion) ---
     if (level == 3) {
       if (isLong) return "This step is too big for today's brain. Let's skip it and stay winning.";
-      
-      return _random([
-        "It seems like a wall. It is 100% okay to skip this and move on.",
-        "Perfectionism is the enemy. Mark it 'done enough' and let's go.",
-        "We are not going to freeze here. Skipping is a strategic victory."
-      ]);
+      return _random(["It seems like a wall. It is 100% okay to skip this and move on.", "Perfectionism is the enemy. Mark it 'done enough' and let's go.", "We are not going to freeze here. Skipping is a strategic victory."]);
     }
-
     return "You are doing great.";
   }
+
+  // ==========================================================
+  // 🎓 DYNAMIC STUDY MODE FEATURES
+  // ==========================================================
+
+  // 1. 🎵 FOCUS AUDIO (Simulated)
+  // Replace your existing dummy _toggleFocusAudio with this:
+Future<void> _toggleFocusAudio() async {
+  setState(() => _isFocusAudioPlaying = !_isFocusAudioPlaying);
+  
+  if (_isFocusAudioPlaying) {
+    String url = "https://ia800300.us.archive.org/1/items/brown-noise-2-hours/Brown%20Noise%202%20Hours.mp3"; // Default Brown Noise
+    // Simple switch for other tracks based on _currentFocusAudio string
+    if (_currentFocusAudio.contains("White")) url = "https://ia800504.us.archive.org/13/items/pink-noise-60-minutes/Pink%20Noise%2060%20minutes.mp3"; 
+    
+    await _musicPlayer.play(UrlSource(url));
+    await _musicPlayer.setReleaseMode(ReleaseMode.loop);
+  } else {
+    await _musicPlayer.stop();
+  }
+}
+
+  // 2. 🎧 PODCAST MODE LOGIC
+  Future<void> _activatePodcastMode() async {
+    String contextText = "";
+    if (_steps.isNotEmpty) {
+      contextText = "The current task step is: ${_steps[_focusIndex]['text']}.";
+    } else if (_textController.text.isNotEmpty) {
+      contextText = "The topic is: ${_textController.text}.";
+    } else {
+      _showInputForPodcast(); 
+      return;
+    }
+
+    Navigator.pop(context); // Close sheet
+    setState(() => _isPodcastLoading = true);
+    
+    try {
+      final String prompt = """
+      You are a friendly, energetic podcast host. 
+      Take the following text and rewrite it as a short, engaging 30-second podcast script.
+      Use simple language, maybe a metaphor, and make it sound exciting to learn/do.
+      TEXT: $contextText
+      """;
+
+      final aiResponse = await RemoteAIService.processRequest(
+        userQuery: prompt, 
+        userSettings: context.read<NeuroSettings>(), 
+        energy: _currentEnergy, 
+        isOverwhelmed: false
+      );
+
+      final script = aiResponse.missionName ?? "I couldn't generate a script."; 
+      
+      setState(() => _isPodcastLoading = false);
+      
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text("🎙️ Podcast Mode"),
+          content: SingleChildScrollView(child: Text(script)),
+          actions: [TextButton(onPressed: () => _tts.stop(), child: const Text("Stop"))],
+        ),
+      );
+
+      await _tts.setSpeechRate(0.55); 
+      await _speak(script);
+
+    } catch (e) {
+      setState(() => _isPodcastLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Podcast generation failed.")));
+    }
+  }
+
+  void _showInputForPodcast() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final c = TextEditingController();
+        return AlertDialog(
+          title: const Text("Paste Study Text"),
+          content: TextField(controller: c, maxLines: 5, decoration: const InputDecoration(hintText: "Paste notes here...")),
+          actions: [
+            TextButton(onPressed: () {
+              Navigator.pop(ctx);
+              _textController.text = c.text; 
+              _activatePodcastMode();
+            }, child: const Text("Make Podcast"))
+          ],
+        );
+      }
+    );
+  }
+
+  // ==========================================================
+  // ⚙️ MISSION CONTROL (UPDATED UI)
+  // ==========================================================
+  void _showTaskSettings() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, 
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return SafeArea(
+          child: StatefulBuilder(
+            builder: (context, setSheetState) {
+              return Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Mission Control 🎛️", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 20),
+                    
+                    // --- 1. VIEW MODES ---
+                    SwitchListTile(
+                      title: const Text("Gamified List View"),
+                      subtitle: const Text("Show all tasks at once"),
+                      value: _isGamifiedMode,
+                      activeColor: Colors.purple,
+                      secondary: Icon(_isGamifiedMode ? Icons.list : Icons.filter_center_focus),
+                      onChanged: (val) {
+                        setSheetState(() => _isGamifiedMode = val);
+                        setState(() => _isGamifiedMode = val);
+                      },
+                    ),
+                    const Divider(),
+
+                    // --- 2. Buddy ---
+                    SwitchListTile(
+                      title: const Text("Smart Buddy"),
+                      subtitle: Text(_isBodyDoubleActive ? "Adaptive Monitoring On" : "Disabled"),
+                      value: _isBodyDoubleActive,
+                      activeColor: Colors.teal,
+                      secondary: const Icon(Icons.record_voice_over),
+                      onChanged: (val) {
+                        setSheetState(() => _isBodyDoubleActive = val);
+                        setState(() {
+                          _isBodyDoubleActive = val;
+                          if (val) {
+                            _stepStopwatch.start();
+                            if (_steps.isNotEmpty) _speak("I'm monitoring.");
+                          } else {
+                            _stepStopwatch.stop();
+                            _tts.stop();
+                          }
+                        });
+                      },
+                    ),
+
+                    const Divider(),
+
+                    // --- 3. 🎓 STUDY TOOLS (NEW) ---
+                    const Text("Dynamic Study Mode", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey)),
+                    const SizedBox(height: 10),
+                    
+                    // Focus Audio
+                    ListTile(
+                      leading: Icon(_isFocusAudioPlaying ? Icons.volume_up : Icons.volume_off, color: Colors.brown),
+                      title: const Text("Focus Audio"),
+                      subtitle: Text(_currentFocusAudio),
+                      trailing: DropdownButton<String>(
+                        value: _currentFocusAudio,
+                        underline: Container(),
+                        items: ["Brown Noise", "White Noise", "Lo-Fi Beats"].map((String value) {
+                          return DropdownMenuItem<String>(value: value, child: Text(value));
+                        }).toList(),
+                        onChanged: (val) {
+                          setSheetState(() => _currentFocusAudio = val!);
+                          setState(() => _currentFocusAudio = val!);
+                          if (_isFocusAudioPlaying) {
+                             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Switched to $val")));
+                          }
+                        },
+                      ),
+                      onTap: () {
+                        _toggleFocusAudio();
+                        Navigator.pop(context);
+                        setSheetState(() {}); 
+                      },
+                    ),
+
+                    // Podcast Mode
+                    ListTile(
+                      leading: const Icon(Icons.headphones, color: Colors.blueAccent),
+                      title: const Text("Podcast Mode"),
+                      subtitle: const Text("Turn text into a fun audio script."),
+                      onTap: () => _activatePodcastMode(),
+                    ),
+
+                    const Divider(),
+
+                    // --- 4. EMERGENCY ---
+                    ListTile(
+                      leading: const Icon(Icons.health_and_safety, color: Color.fromARGB(255, 109, 233, 255)),
+                      title: const Text("Panic Mode", style: TextStyle(fontWeight: FontWeight.bold, color: Color.fromARGB(255, 109, 233, 255))),
+                      subtitle: const Text("Immediate sensory reduction."),
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const PanicModeScreen()));
+                      },
+                    ),
+                  ],
+                ),
+              );
+            }
+          ),
+        );
+      }
+    );
+  }
+
+  // ------------------------------------------------------------------------
+  // HELPER METHODS (Preserved)
+  // ------------------------------------------------------------------------
 
   String _extractTaskSubject(String text) {
     final words = text.split(' ');
@@ -315,13 +462,11 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
       double ratio = actual / estimated;
       ratio = ratio.clamp(0.5, 3.0); 
       _paceHistory.add(ratio);
-      
       double sum = _paceHistory.fold(0, (p, c) => p + c);
       setState(() {
         _currentPaceFactor = sum / _paceHistory.length;
       });
     }
-    
     _stepStopwatch.reset();
     _interventionLevel = 0;
   }
@@ -526,9 +671,9 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     }
 
     if (_steps.every((s) => s['done'] == true)) {
-        context.read<NeuroSettings>().awardXp(50);
-        _showCompletionCelebration();
-        _stepStopwatch.stop();
+       context.read<NeuroSettings>().awardXp(50);
+       _showCompletionCelebration();
+       _stepStopwatch.stop();
     }
   }
 
@@ -543,89 +688,6 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) Navigator.pop(context);
     });
-  }
-
-  void _showTaskSettings() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true, 
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) {
-        return SafeArea(
-          child: StatefulBuilder(
-            builder: (context, setSheetState) {
-              return Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text("Mission Control 🎛️", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 20),
-                    
-                    SwitchListTile(
-                      title: const Text("Gamified List View"),
-                      subtitle: const Text("Show all tasks at once"),
-                      value: _isGamifiedMode,
-                      activeColor: Colors.purple,
-                      secondary: Icon(_isGamifiedMode ? Icons.list : Icons.filter_center_focus),
-                      onChanged: (val) {
-                        setSheetState(() => _isGamifiedMode = val);
-                        setState(() => _isGamifiedMode = val);
-                      },
-                    ),
-                    
-                    const Divider(),
-
-                    SwitchListTile(
-                      title: const Text("Smart Buddy"),
-                      subtitle: Text(_isBodyDoubleActive ? "Adaptive Monitoring On" : "Disabled"),
-                      value: _isBodyDoubleActive,
-                      activeColor: Colors.teal,
-                      secondary: const Icon(Icons.record_voice_over),
-                      onChanged: (val) {
-                        setSheetState(() => _isBodyDoubleActive = val);
-                        setState(() {
-                          _isBodyDoubleActive = val;
-                          if (val) {
-                            _stepStopwatch.start();
-                            if (_steps.isNotEmpty) _speak("I'm monitoring.");
-                          } else {
-                            _stepStopwatch.stop();
-                            _tts.stop();
-                          }
-                        });
-                      },
-                    ),
-                    
-                    if (_isBodyDoubleActive)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 16, bottom: 8),
-                        child: Text(
-                          "🧠 Pace Factor: ${_currentPaceFactor.toStringAsFixed(2)}x",
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                        ),
-                      ),
-
-                    const Divider(),
-
-                    ListTile(
-                      leading: const Icon(Icons.health_and_safety, color: Color.fromARGB(255, 109, 233, 255)),
-                      title: const Text("Panic Mode", style: TextStyle(fontWeight: FontWeight.bold, color: Color.fromARGB(255, 109, 233, 255))),
-                      subtitle: const Text("Immediate sensory reduction."),
-                      onTap: () {
-                        Navigator.pop(context);
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => const PanicModeScreen()));
-                      },
-                    ),
-                  ],
-                ),
-              );
-            }
-          ),
-        );
-      }
-    );
   }
 
   void _showClarificationDialog(AIResponse response, String contextText) {
@@ -691,7 +753,6 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     );
   }
 
-  // ✅ Minimalist Stats Header
   Widget _buildXpHeader() {
     final xp = context.watch<NeuroSettings>().xp;
     final level = context.watch<NeuroSettings>().level;
@@ -705,14 +766,12 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
       ),
       child: Row(
         children: [
-          // Level Circle
           Container(
             width: 36, height: 36,
             decoration: BoxDecoration(color: Colors.teal.shade50, shape: BoxShape.circle),
             child: Center(child: Text("$level", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal.shade700))),
           ),
           const SizedBox(width: 12),
-          // Clean Bar
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -750,7 +809,6 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
           appBar: AppBar(
             title: const Text("Tasks"),
             centerTitle: true,
-            // Clean AppBar: Only settings
             actions: [
               IconButton(icon: const Icon(Icons.tune), onPressed: _showTaskSettings),
               const SizedBox(width: 8),
@@ -758,9 +816,11 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
           ),
           body: Column(
             children: [
-              // ✅ ADDED XP HEADER HERE
               _buildXpHeader(),
               
+              if (_isPodcastLoading) 
+                const LinearProgressIndicator(color: Colors.blueAccent),
+
               Expanded(
                 child: _isLoading ? Center(child: Text(_statusMessage)) : _buildMainContent(),
               ),
@@ -788,9 +848,6 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     return _buildFocusView();
   }
 
-  // ------------------------------------------------------------------------
-  // 🛠️ FIX 2: UX SCROLL FIX (Centers content, but allows scrolling if small screen)
-  // ------------------------------------------------------------------------
   Widget _buildFocusView() {
     if (_focusIndex >= _steps.length) {
       return Center(
@@ -811,7 +868,6 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     final isDone = step['done'] == true;
     final progress = (_focusIndex + 1) / _steps.length;
 
-    // ✅ FIXED: Using LayoutBuilder + SingleChildScrollView to prevent RenderFlex Overflow
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
