@@ -9,7 +9,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:uuid/uuid.dart';
 import 'package:confetti/confetti.dart'; 
-import 'package:flutter_animate/flutter_animate.dart'; 
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_tts/flutter_tts.dart'; 
 
 import '../logic/advanced_logger.dart'; 
 import '../logic/remote_ai_service.dart';
@@ -50,7 +51,10 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
   
   // ✅ GAMIFICATION STATE
   List<Map<String, dynamic>> _steps = []; 
+  int _focusIndex = 0;
+  AIResponse? _currentAiResponse;
   late ConfettiController _confettiController;
+  final FlutterTts _tts = FlutterTts();
 
   @override
   void initState() {
@@ -58,10 +62,16 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
     _confettiController = ConfettiController(duration: const Duration(seconds: 1));
   }
 
+  Future<void> _initTts() async {
+    await _tts.setLanguage("en-US");
+    await _tts.setSpeechRate(0.5);
+  }
+
   @override
   void dispose() {
     _textController.dispose();
     _confettiController.dispose();
+    _tts.stop();
     super.dispose();
   }
 
@@ -155,8 +165,8 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
       jsonContent: {
         "hasImage": _pendingImageBytes != null,
         "isVoice": _isListening, 
-        "isOverwhelmed": _isOverwhelmed,
-        "energyLevel": _currentEnergy
+        "isOverwhelmed": context.read<NeuroSettings>().isOverwhelmed,
+        "energyLevel": context.read<NeuroSettings>().energyLevel
       }
     );
 
@@ -230,8 +240,8 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
           userQuery: finalQuery,
           imageBytes: imageBytes,
           userSettings: settings,
-          energy: _currentEnergy,
-          isOverwhelmed: _isOverwhelmed,
+          energy: settings.energyLevel,
+          isOverwhelmed: settings.isOverwhelmed,
         );
       }
 
@@ -243,26 +253,14 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
         _saveToHistorySafely(finalQuery, aiResponse, imageBytes);
         
         // 🔀 FORK IN THE ROAD: Check which mode we are in!
-        if (_isGamifiedMode) {
-          // 🎲 GAMIFIED: Stay here, populate list
-          setState(() {
-            _steps = aiResponse!.actions.map((action) => {
-              "text": action.instruction, 
-              "done": false
-            }).toList();
-          });
-        } else {
-          // 🧘 FOCUS MODE: Navigate to Interactive Screen (Old UI)
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => InteractiveTaskScreen(
-                response: aiResponse!,
-                dyslexiaMode: settings.dyslexiaMode,
-              ),
-            ),
-          );
-        }
+        setState(() {
+          _currentAiResponse = aiResponse;
+          _steps = aiResponse!.actions.map((action) => {
+            "text": action.instruction, 
+            "done": false,
+            "seconds": action.estimatedSeconds ?? 60
+          }).toList();
+        });
       }
     } catch (e) {
       _showErrorMessage("Connection failed. Try again.");
@@ -309,6 +307,47 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
       );
     }
     
+    if (_steps.every((s) => s['done'] == true)) {
+       context.read<NeuroSettings>().awardXp(50);
+       ScaffoldMessenger.of(context).showSnackBar(
+         const SnackBar(
+           content: Text("🏆 MISSION COMPLETE! +50 XP"), 
+           backgroundColor: Colors.purple,
+         )
+       );
+    }
+  }
+
+  void _completeStep(int index) {
+    setState(() {
+      _steps[index]['done'] = true;
+    });
+
+    // Gamification Rewards
+    final settings = context.read<NeuroSettings>();
+    settings.awardXp(10);
+    _confettiController.play(); 
+    
+    // Feedback
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("✨ Awesome! +10 XP (Total: ${settings.xp + 10})"),
+        backgroundColor: Colors.teal,
+        duration: const Duration(seconds: 1),
+      ),
+    );
+    
+    // Auto-advance in focus mode
+    if (!_isGamifiedMode && _focusIndex < _steps.length - 1) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if(mounted) {
+          setState(() => _focusIndex++);
+          _tts.speak(_steps[_focusIndex]['text']);
+        }
+      });
+    }
+
     if (_steps.every((s) => s['done'] == true)) {
        context.read<NeuroSettings>().awardXp(50);
        ScaffoldMessenger.of(context).showSnackBar(
@@ -430,7 +469,10 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
                        setState(() {
                          _isGamifiedMode = val;
                          // Clear steps if switching to focus mode so it doesn't look cluttered
-                         if (!val) _steps.clear(); 
+                         if (!val && _steps.isNotEmpty) {
+                           // Speak first step when switching to focus
+                           _tts.speak(_steps[_focusIndex]['text']);
+                         }
                        });
                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                          content: Text(val ? "🎲 Gamified Mode: Checklist + XP" : "🧘 Focus Mode: Step-by-Step Guide"),
@@ -483,50 +525,169 @@ class _TaskBreakdownScreenState extends State<TaskBreakdownScreen> {
   }
 
   // 📄 BUILD CONTENT BASED ON MODE
-  Widget _buildMainContent() {
-    // If we are in Gamified Mode AND have steps, show the list
-    if (_isGamifiedMode && _steps.isNotEmpty) {
-      return ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: _steps.length,
-        separatorBuilder: (_,__) => const Divider(),
-        itemBuilder: (ctx, index) {
-          final step = _steps[index];
-          return CheckboxListTile(
-            title: Text(step['text'], 
-              style: TextStyle(
-                decoration: step['done'] ? TextDecoration.lineThrough : null,
-                color: step['done'] ? Colors.grey : Colors.black,
-              ),
-            ),
-            value: step['done'],
-            activeColor: Colors.teal,
-            onChanged: (val) => _toggleStep(index, val),
-          ).animate().fadeIn(delay: (index * 100).ms).slideX();
-        },
+ 
+    Widget _buildMainContent() {
+    if (_steps.isEmpty) {
+      return _buildPlaceholder();
+    }
+
+    if (_isGamifiedMode) {
+      return _buildListView();
+    } else {
+      return _buildFocusView();
+    }
+  }
+
+  Widget _buildFocusView() {
+    // Safety check
+    if (_focusIndex >= _steps.length) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.check_circle, size: 80, color: Colors.teal),
+            const SizedBox(height: 16),
+            const Text("All Done!", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            TextButton(
+              onPressed: () => setState(() => _focusIndex = 0),
+              child: const Text("Restart"),
+            )
+          ],
+        ),
       );
-    } 
-    
-    // Otherwise (Focus Mode OR Empty Gamified List), show the placeholder
+    }
+
+    final step = _steps[_focusIndex];
+    final isDone = step['done'] == true;
+
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          LinearProgressIndicator(
+            value: (_focusIndex + 1) / _steps.length,
+            backgroundColor: Colors.grey.shade200,
+            color: Colors.teal,
+            minHeight: 6,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          const SizedBox(height: 10),
+          Text("Step ${_focusIndex + 1} of ${_steps.length}", style: TextStyle(color: Colors.grey.shade600)),
+          
+          const Spacer(),
+          
+          Text(
+            step['text'],
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 26, 
+              fontWeight: FontWeight.bold, 
+              height: 1.3
+            ),
+          ),
+          
+          const SizedBox(height: 20),
+          if (step['seconds'] != null)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.timer, color: Colors.grey, size: 18),
+                const SizedBox(width: 5),
+                Text("${step['seconds']}s estimated", style: const TextStyle(color: Colors.grey)),
+              ],
+            ),
+
+          const Spacer(),
+
+          // ✅ BIG FOCUS BUTTON
+          SizedBox(
+            width: double.infinity,
+            height: 70,
+            child: ElevatedButton(
+              onPressed: isDone ? null : () => _completeStep(_focusIndex),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isDone ? Colors.grey : Colors.teal,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              ),
+              child: isDone 
+                ? const Text("Completed", style: TextStyle(fontSize: 20, color: Colors.white))
+                : const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle_outline, size: 28, color: Colors.white),
+                      SizedBox(width: 10),
+                      Text("Mark Done", style: TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          // Navigation controls
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _focusIndex > 0 ? () => setState(() => _focusIndex--) : null,
+              ),
+              IconButton(
+                icon: const Icon(Icons.arrow_forward),
+                onPressed: _focusIndex < _steps.length - 1 ? () => setState(() => _focusIndex++) : null,
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  // 📋 LIST VIEW (Gamified)
+  Widget _buildListView() {
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: _steps.length,
+      separatorBuilder: (_,__) => const Divider(),
+      itemBuilder: (ctx, index) {
+        final step = _steps[index];
+        return CheckboxListTile(
+          title: Text(step['text'], 
+            style: TextStyle(
+              decoration: step['done'] ? TextDecoration.lineThrough : null,
+              color: step['done'] ? Colors.grey : Colors.black,
+            ),
+          ),
+          value: step['done'],
+          activeColor: Colors.teal,
+          onChanged: (val) {
+            setState(() {
+              step['done'] = val;
+            });
+            if (val == true) {
+              _completeStep(index);
+            }
+          },
+        ).animate().fadeIn(delay: (index * 50).ms).slideX();
+      },
+    );
+  }
+
+  Widget _buildPlaceholder() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            _isGamifiedMode ? Icons.checklist : Icons.accessibility_new, 
+            _isGamifiedMode ? Icons.checklist : Icons.filter_center_focus, 
             size: 64, 
-            color: Colors.grey
+            color: Colors.grey.shade300
           ),
           const SizedBox(height: 10),
           Text(
-            _isGamifiedMode ? "Ready for XP?" : "I am Iron Man !", 
-            style: const TextStyle(fontSize: 18, color: Colors.grey),
+            " I am Iron Man!", 
+            style: TextStyle(fontSize: 18, color: Colors.grey.shade400),
           ),
-          if (!_isGamifiedMode)
-             const Padding(
-               padding: EdgeInsets.only(top: 8.0),
-               child: Text("(Focus Mode Active)", style: TextStyle(fontSize: 12, color: Colors.teal)),
-             )
         ],
       ),
     );

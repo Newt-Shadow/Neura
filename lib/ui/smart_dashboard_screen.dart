@@ -320,7 +320,7 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
             const SizedBox(height: 24),
 
             _HeroCard(
-              title: "Body Double",
+              title: "Buddy",
               subtitle: "Work together. No pressure.",
               icon: Icons.people_outline,
               color: Colors.purple.shade50,

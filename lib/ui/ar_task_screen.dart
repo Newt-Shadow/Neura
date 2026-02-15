@@ -98,7 +98,7 @@ class _ArTaskScreenState extends State<ArTaskScreen> with WidgetsBindingObserver
       if (!_hasMovedRecently && mounted) {
         _tts.speak("I noticed we stopped. Is there a blocker? Let's just do one tiny thing.");
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: const Text("👀 Body Double: Are we stuck?"),
+          content: const Text("👀 Buddy: Are we stuck?"),
           backgroundColor: Colors.orange,
           action: SnackBarAction(label: "I'm working!", onPressed: _resetStuckTimer),
         ));

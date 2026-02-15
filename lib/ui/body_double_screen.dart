@@ -60,7 +60,7 @@ class _BodyDoubleScreenState extends State<BodyDoubleScreen> {
     return Scaffold(
       backgroundColor: Colors.teal.shade50,
       appBar: AppBar(
-        title: const Text("Body Double"),
+        title: const Text("Buddy"),
         backgroundColor: Colors.teal.shade50,
         elevation: 0,
       ),
