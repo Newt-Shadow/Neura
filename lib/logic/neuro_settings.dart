@@ -1,11 +1,12 @@
 import 'dart:convert';
+import 'dart:math' as math; // ✅ Added for max()
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart'; // For kIsWeb
-import 'package:universal_io/io.dart'; // For Platform check
+import 'package:flutter/foundation.dart'; 
+import 'package:universal_io/io.dart'; 
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:encrypt/encrypt.dart' as enc;
@@ -20,7 +21,7 @@ class NeuroSettings extends ChangeNotifier {
 
   final enc.Key _encKey = enc.Key.fromUtf8(
     'NeuroAppSecureKey123456789012345',
-  ); // 32 chars
+  ); 
   final enc.IV _iv = enc.IV.fromUtf8('NeuroAppIV123456');
 
   // ============================================================
@@ -30,7 +31,12 @@ class NeuroSettings extends ChangeNotifier {
   String _userApiKey = "";
   Map<String, String> _profile = {};
   List<Map<String, String>> _history = [];
+  
+  // Gamification State
   int _streakCount = 0;
+  int _xp = 0;
+  int _level = 1;
+  bool _showLevelUpAnimation = false;
 
   double _energyLevel = 0.5;
   bool _isOverwhelmed = false;
@@ -70,6 +76,14 @@ class NeuroSettings extends ChangeNotifier {
 
   List<Map<String, String>> get history => _history;
 
+  // 🎮 Gamification Getters
+  int get xp => _xp;
+  int get level => _level;
+  bool get showLevelUpAnimation => _showLevelUpAnimation;
+  
+  int get xpToNextLevel => _level * 100;
+  double get levelProgress => (_xp / xpToNextLevel).clamp(0.0, 1.0);
+
   // ============================================================
   // 🚀 INITIALIZATION
   // ============================================================
@@ -77,22 +91,12 @@ class NeuroSettings extends ChangeNotifier {
   Future<void> loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
 
-    // 🔑 API KEY LOAD ORDER:
-    // 1. Secure Storage
-    // 2. .env fallback
     final storedKey = await _secureStorage.read(key: "gemini_api_key");
-
     final envKey = dotenv.env['GEMINI_API_KEY'];
 
     _userApiKey = (storedKey != null && storedKey.isNotEmpty)
         ? storedKey
         : (envKey ?? "");
-
-    if (_userApiKey.isEmpty) {
-      debugPrint("⚠ GEMINI_API_KEY NOT FOUND");
-    } else {
-      debugPrint("✅ GEMINI KEY LOADED");
-    }
 
     // Load profile
     final profileJson = prefs.getString('local_profile');
@@ -102,6 +106,11 @@ class NeuroSettings extends ChangeNotifier {
 
     _useLocalModel = prefs.getBool('use_local_model') ?? false;
     _streakCount = prefs.getInt('streak') ?? 0;
+    
+    // Load Gamification
+    _xp = prefs.getInt('user_xp') ?? 0;
+    _level = prefs.getInt('user_level') ?? 1;
+
     _energyLevel = prefs.getDouble('energy_level') ?? 0.5;
     _isOverwhelmed = prefs.getBool('is_overwhelmed') ?? false;
 
@@ -119,6 +128,34 @@ class NeuroSettings extends ChangeNotifier {
     });
 
     notifyListeners();
+  }
+
+  // ============================================================
+  // 🎮 GAMIFICATION LOGIC
+  // ============================================================
+
+  void awardXp(int amount) {
+    _xp += amount;
+    
+    // Check for Level Up
+    if (_xp >= xpToNextLevel) {
+      _xp -= xpToNextLevel; 
+      _level++;
+      _showLevelUpAnimation = true;
+      
+      Future.delayed(const Duration(seconds: 5), () {
+        _showLevelUpAnimation = false; 
+        notifyListeners();
+      });
+    }
+
+    _saveToLocal();
+    _saveToCloud();
+    notifyListeners();
+  }
+
+  void consumeLevelUpEvent() {
+    _showLevelUpAnimation = false;
   }
 
   // ============================================================
@@ -149,7 +186,6 @@ class NeuroSettings extends ChangeNotifier {
     notifyListeners();
   }
 
-  // 🆕 Toggle Local LLM
   void toggleLocalModel(bool value) async {
     _useLocalModel = value;
     final prefs = await SharedPreferences.getInstance();
@@ -232,6 +268,8 @@ class NeuroSettings extends ChangeNotifier {
     _history.clear();
     _profile.clear();
     _streakCount = 0;
+    _xp = 0;
+    _level = 1;
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
@@ -244,34 +282,8 @@ class NeuroSettings extends ChangeNotifier {
   // ============================================================
 
   Future<void> _syncFromCloud() async {
+    // This method is legacy/backup. Real logic is in startCloudListener
     if (currentUser == null) return;
-
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser!.uid)
-          .get();
-
-      if (!doc.exists ||
-          doc.data() == null ||
-          doc.data()!['encrypted_profile'] == null ||
-          doc.data()!['encrypted_profile'] == '') {
-        print("☁️ No cloud profile found");
-        return;
-      }
-
-      final data = doc.data()!;
-
-      _profile = _decryptMap(data['encrypted_profile']);
-      _streakCount = data['streak'] ?? 0;
-
-      await _saveToLocal();
-      notifyListeners();
-
-      print("☁️ Pulled Profile from Cloud (Cloud is source of truth)");
-    } catch (e) {
-      debugPrint("Cloud Sync Error: $e");
-    }
   }
 
   Future<void> _saveToCloud() async {
@@ -288,9 +300,10 @@ class NeuroSettings extends ChangeNotifier {
           .set({
             'encrypted_profile': encryptedProfile,
             'streak': _streakCount,
+            'xp': _xp,
+            'level': _level,
             'last_updated': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
-      print("☁️ Saved Profile to Cloud");
     } catch (e) {
       debugPrint("Cloud Save Error: $e");
     }
@@ -302,13 +315,12 @@ class NeuroSettings extends ChangeNotifier {
 
   Future<void> _saveToLocal() async {
     final prefs = await SharedPreferences.getInstance();
-
     await prefs.setString('local_profile', json.encode(_profile));
-
     await prefs.setString('local_history', json.encode(_history));
-
     await prefs.setInt('streak', _streakCount);
-    print("💾 Settings Saved Locally: $_profile");
+    await prefs.setInt('user_xp', _xp);
+    await prefs.setInt('user_level', _level);
+    print("💾 Settings Saved Locally");
   }
 
   // ============================================================
@@ -325,71 +337,34 @@ class NeuroSettings extends ChangeNotifier {
     }
   }
 
-  List<dynamic> _decryptList(String base64String) {
-    try {
-      final encrypter = enc.Encrypter(enc.AES(_encKey));
-      final decrypted = encrypter.decrypt64(base64String, iv: _iv);
-      return json.decode(decrypted) as List<dynamic>;
-    } catch (_) {
-      return [];
-    }
-  }
-
   // ============================================================
-  // 🧾 PROFILE STRING FOR PROMPT
-  // ============================================================
-
-  String generateProfileString() {
-    return """
-USER PROFILE:
-- Name: $userName
-- Diagnosis: $disabilityType
-- Struggle: $executiveStruggle
-- Sensory: $sensoryTriggers
-- Interest: $interest
-""";
-  }
-
-  // ============================================================
-  // 🔐 AUTH
+  // 🔐 AUTH & CLOUD LISTENER (FIXED)
   // ============================================================
 
   Future<User?> signInWithGoogle() async {
     try {
       _setLoading(true);
-
       UserCredential userCredential;
 
       if (kIsWeb) {
-        // 🌐 WEB LOGIN (Popup prevents manual URI headache)
         final provider = GoogleAuthProvider();
-        userCredential =
-            await FirebaseAuth.instance.signInWithPopup(provider);
+        userCredential = await FirebaseAuth.instance.signInWithPopup(provider);
       } else {
-        // 📱 MOBILE LOGIN
         final googleUser = await _googleSignIn.signIn();
         if (googleUser == null) {
           _setLoading(false);
           return null;
         }
-
         final googleAuth = await googleUser.authentication;
-
         final credential = GoogleAuthProvider.credential(
           accessToken: googleAuth.accessToken,
           idToken: googleAuth.idToken,
         );
-
-        userCredential =
-            await FirebaseAuth.instance.signInWithCredential(credential);
+        userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
       }
 
-      // 🔥 CRITICAL: Pull existing data BEFORE auto-save kicks in
       await _forceInitialPullFromCloud(userCredential.user!.uid);
-      
-      // Start Real-time sync
       startCloudListener();
-
       _setLoading(false);
       return userCredential.user;
     } catch (e) {
@@ -401,23 +376,19 @@ USER PROFILE:
 
   Future<void> _forceInitialPullFromCloud(String uid) async {
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .get();
+      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
 
       if (doc.exists && doc.data() != null) {
         final data = doc.data()!;
         if (data.containsKey('encrypted_profile')) {
-          // EXISTING USER: Restore from Cloud
           _profile = _decryptMap(data['encrypted_profile']);
           _streakCount = data['streak'] ?? 0;
-          await _saveToLocal(); // Cache immediately
+          _xp = data['xp'] ?? 0;
+          _level = data['level'] ?? 1;
+
+          await _saveToLocal();
           notifyListeners();
-          print("📥 Existing profile found and restored from Cloud.");
         }
-      } else {
-        print("🌱 New User (or empty cloud). Keeping defaults.");
       }
     } catch (e) {
       print("⚠️ Error checking cloud profile: $e");
@@ -434,18 +405,35 @@ USER PROFILE:
         .listen((doc) {
       if (doc.exists && doc.data() != null) {
         final data = doc.data()!;
-        if (data['encrypted_profile'] == null ||
-            data['encrypted_profile'] == '') return;
+        
+        // 🔒 Decrypt Profile
+        final remoteProfile = data['encrypted_profile'] != null 
+             ? _decryptMap(data['encrypted_profile'])
+             : _profile;
 
-        final remoteProfile = _decryptMap(data['encrypted_profile']);
+        // 🔥 GAMIFICATION FIX:
+        // Always take the HIGHER value to prevent slow network overwriting progress
+        final remoteXp = data['xp'] ?? _xp;
+        final remoteLevel = data['level'] ?? _level;
+        final remoteStreak = data['streak'] ?? _streakCount;
 
-        // Only update if remote is actually different to avoid infinite loops
+        bool changed = false;
+
+        // Use math.max to ensure we never lose XP due to sync lag
+        if (remoteXp > _xp) { _xp = remoteXp; changed = true; }
+        if (remoteLevel > _level) { _level = remoteLevel; changed = true; }
+        if (remoteStreak > _streakCount) { _streakCount = remoteStreak; changed = true; }
+
+        // Profile sync
         if (json.encode(_profile) != json.encode(remoteProfile)) {
-          _profile = remoteProfile;
-          _streakCount = data['streak'] ?? _streakCount;
+           _profile = remoteProfile;
+           changed = true;
+        }
+
+        if (changed) {
           _saveToLocal();
           notifyListeners();
-          print("🔄 Devices Synced in Real-time.");
+          print("🔄 Synced with Cloud (Kept Highest Progress)");
         }
       }
     }, onError: (e) {
@@ -456,7 +444,7 @@ USER PROFILE:
   Future<void> signOut() async {
     await _googleSignIn.signOut();
     await FirebaseAuth.instance.signOut();
-    _profile = {}; // Clear sensitive data from RAM on logout
+    _profile = {};
     notifyListeners();
   }
 

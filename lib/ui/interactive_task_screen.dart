@@ -79,16 +79,19 @@ class _InteractiveTaskScreenState extends State<InteractiveTaskScreen> {
       if (!_isBodyDoubleActive || widget.response.actions.isEmpty) return;
 
       final currentStep = widget.response.actions[_currentIndex];
-      final limitSeconds = currentStep.estimatedSeconds ?? 60;
+      final limitSeconds = currentStep.estimatedSeconds;
+      // Default to 60s if null, just to have a baseline
+      final safeLimit = limitSeconds ?? 60;
+      
       final elapsed = _stepStopwatch.elapsed.inSeconds;
 
-      if (_interventionLevel == 0 && elapsed > (limitSeconds * 1.5)) {
+      if (_interventionLevel == 0 && elapsed > (safeLimit * 1.5)) {
          _triggerSmartIntervention(1);
       }
-      else if (_interventionLevel == 1 && elapsed > (limitSeconds * 3.0)) {
+      else if (_interventionLevel == 1 && elapsed > (safeLimit * 3.0)) {
          _triggerSmartIntervention(2);
       }
-      else if (_interventionLevel == 2 && elapsed > (limitSeconds * 5.0)) {
+      else if (_interventionLevel == 2 && elapsed > (safeLimit * 5.0)) {
          _triggerSmartIntervention(3);
       }
     });
@@ -152,6 +155,11 @@ class _InteractiveTaskScreenState extends State<InteractiveTaskScreen> {
       _speakCurrentStep();
     } else {
       _tts.stop();
+      // ✅ AWARD XP & STREAK AT END OF FOCUS MODE
+      final settings = context.read<NeuroSettings>();
+      settings.awardXp(50); 
+      settings.incrementStreak();
+      
       _showCompletionCelebration();
     }
   }
@@ -216,13 +224,12 @@ class _InteractiveTaskScreenState extends State<InteractiveTaskScreen> {
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         title: const Text("Done. ✅"),
-        content: const Text("Task complete. Well done."),
+        content: const Text("Task complete. +50 XP!"),
         actions: [
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
               Navigator.pop(context);
-              context.read<NeuroSettings>().incrementStreak();
             },
             child: const Text("Close", style: TextStyle(color: Colors.teal)),
           )
@@ -296,7 +303,7 @@ class _InteractiveTaskScreenState extends State<InteractiveTaskScreen> {
               const SizedBox(height: 24),
 
               // ✅ SUBTLE TIME GOAL
-              if (step.estimatedSeconds != null)
+              if (step.estimatedSeconds > 0)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
