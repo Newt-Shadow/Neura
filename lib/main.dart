@@ -94,7 +94,7 @@ class MyApp extends StatelessWidget {
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: "Neura",
+      title: "Neuro",
       theme: ThemeData(
         fontFamily: settings.fontFamily,
         brightness: settings.highContrast ? Brightness.dark : Brightness.light,

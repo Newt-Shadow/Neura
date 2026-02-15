@@ -5,7 +5,6 @@ import 'package:flutter_gemma/flutter_gemma.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:confetti/confetti.dart';
 import 'package:percent_indicator/percent_indicator.dart';
-import 'package:animated_text_kit/animated_text_kit.dart';
 
 import 'panic_mode_screen.dart';
 import 'body_double_screen.dart';
@@ -17,7 +16,6 @@ import 'neuro_profile_screen.dart';
 import 'task_breakdown_screen.dart';
 import 'sign_in_screen.dart';
 import 'model_setup_screen.dart';
-import 'translator_screen.dart';
 import 'debug_log_screen.dart';
 
 class SmartDashboardScreen extends StatefulWidget {
@@ -28,29 +26,22 @@ class SmartDashboardScreen extends StatefulWidget {
 }
 
 class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
-  String _loadingStatus = "";
-  final String _modelUrl =
-      'https://huggingface.co/google/gemma-3n-E2B-it-litert-preview/resolve/main/gemma-3n-E2B-it-int4.task';
+  final String _modelUrl = 'https://huggingface.co/google/gemma-3n-E2B-it-litert-preview/resolve/main/gemma-3n-E2B-it-int4.task';
   final String _filename = 'gemma-3n-E2B-it-int4.task';
 
   int _selectedIndex = 0;
-  
   late ConfettiController _confettiController;
 
   @override
   void initState() {
     super.initState();
     _confettiController = ConfettiController(duration: const Duration(seconds: 3));
+    WidgetsBinding.instance.addPostFrameCallback((_) => _autoLoadModel());
     
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _autoLoadModel();
-    });
-    
-    final settings = context.read<NeuroSettings>();
-    settings.addListener(() {
-      if (settings.showLevelUpAnimation && mounted) {
+    context.read<NeuroSettings>().addListener(() {
+      if (context.read<NeuroSettings>().showLevelUpAnimation && mounted) {
         _confettiController.play();
-        settings.consumeLevelUpEvent(); 
+        context.read<NeuroSettings>().consumeLevelUpEvent();
         ScaffoldMessenger.of(context).showSnackBar(
            const SnackBar(content: Text("🎉 LEVEL UP! You are amazing! 🎉"), backgroundColor: Colors.purple),
         );
@@ -66,196 +57,70 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
 
   Future<void> _autoLoadModel() async {
     final settings = context.read<NeuroSettings>();
-    if (!settings.useLocalModel) return;
-    if (ModelHolder.isModelLoaded) return;
-
-    final downloader = GemmaDownloaderDataSource(
-      model: DownloadModel(modelUrl: _modelUrl, modelFilename: _filename),
-    );
+    if (!settings.useLocalModel || ModelHolder.isModelLoaded) return;
+    final downloader = GemmaDownloaderDataSource(model: DownloadModel(modelUrl: _modelUrl, modelFilename: _filename));
     await downloader.checkModelExistence();
   }
 
   @override
   Widget build(BuildContext context) {
-    // 🔥 CONSUMER ensures we rebuild whenever Settings changes
     return Consumer<NeuroSettings>(
       builder: (context, settings, child) {
         final isGuest = settings.currentUser == null;
-        final String? authorizedEmail = dotenv.env['ADMIN_EMAIL'];
-        final String? currentEmail = settings.currentUser?.email;
-        final bool isAdmin = (currentEmail != null && authorizedEmail != null && currentEmail.trim() == authorizedEmail.trim());
-
+        
         final List<Widget> screens = [
-          _buildDashboardBody(settings),
+          _buildZenDashboard(settings),
           const NeuroProfileScreen(),
         ];
 
-        // ✅ FIX: Wrapped Scaffold and Confetti in a Stack so Confetti plays OVER the UI
         return Stack(
           children: [
             Scaffold(
               appBar: AppBar(
-                title: const Text(
-                  " Neura ",
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                centerTitle: true,
+                title: const Text("Neura", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                leading: IconButton(
+                  icon: const Icon(Icons.health_and_safety, color: Colors.pinkAccent),
+                  tooltip: "Panic Mode",
+                  onPressed: () => Navigator.push(context, PageRouteBuilder(
+                    pageBuilder: (_, __, ___) => const PanicModeScreen(),
+                    transitionsBuilder: (_, a, __, c) => FadeTransition(opacity: a, child: c),
+                  )),
                 ),
                 actions: [
-                  // Streak Counter
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    margin: const EdgeInsets.only(right: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.local_fire_department,
-                          color: Colors.orange,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          "${settings.streakCount}",
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.orange,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // In your AppBar actions:
-                  if (isAdmin)
-                    IconButton(
-                      icon: const Icon(Icons.terminal, color: Colors.grey),
-                      tooltip: "System Logs (Admin)",
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const DebugLogScreen()),
-                        );
-                      },
-                    ),
-                  // 🚨 PANIC BUTTON
-                  IconButton(
-                    icon: const Icon(
-                      Icons.volunteer_activism,
-                      color: Colors.pinkAccent,
-                    ),
-                    tooltip: "Sensory Rescue",
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        PageRouteBuilder(
-                          pageBuilder: (_, __, ___) => const PanicModeScreen(),
-                          transitionsBuilder: (_, a, __, c) =>
-                              FadeTransition(opacity: a, child: c),
-                        ),
-                      );
-                    },
-                  ),
-                  // 🔋 BRAIN BATTERY (Fixed)
-                  IconButton(
-                    onPressed: () => _showBrainStateMenu(context, settings),
-                    icon: Icon(
-                      settings.isOverwhelmed
-                          ? Icons.battery_alert
-                          : _getBatteryIcon(settings.energyLevel),
-                      color: _getBatteryColor(settings.energyLevel),
-                    ),
-                  ),
-                  // Sign In / Profile Button
                   if (isGuest)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8.0),
-                      child: TextButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const SignInScreen()),
-                          );
-                        },
-                        icon: const Icon(Icons.login, color: Colors.teal),
-                        label: const Text(
-                          "Sign In",
-                          style: TextStyle(
-                            color: Colors.teal,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+                    IconButton(
+                      icon: const Icon(Icons.login, color: Colors.teal),
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SignInScreen())),
                     )
                   else
-                    PopupMenuButton<String>(
-                      icon: CircleAvatar(
-                        backgroundColor: Colors.teal,
-                        backgroundImage: settings.currentUser?.photoURL != null
-                            ? NetworkImage(settings.currentUser!.photoURL!)
-                            : null,
-                        child: settings.currentUser?.photoURL == null
-                            ? const Icon(Icons.person, color: Colors.white)
-                            : null,
+                    Padding(
+                      padding: const EdgeInsets.only(right: 16.0),
+                      child: GestureDetector(
+                        onTap: () => setState(() => _selectedIndex = 1),
+                        child: CircleAvatar(
+                          radius: 18,
+                          backgroundColor: Colors.teal.shade100,
+                          backgroundImage: settings.currentUser?.photoURL != null ? NetworkImage(settings.currentUser!.photoURL!) : null,
+                          child: settings.currentUser?.photoURL == null ? const Icon(Icons.person, color: Colors.teal) : null,
+                        ),
                       ),
-                      onSelected: (val) {
-                        if (val == 'profile') {
-                          setState(() => _selectedIndex = 1); // Go to Profile Tab
-                        } else if (val == 'logout') {
-                          settings.signOut();
-                        }
-                      },
-                      itemBuilder: (ctx) => [
-                        PopupMenuItem(
-                          value: 'profile',
-                          child: Text(
-                            "Logged in as ${settings.currentUser?.displayName ?? 'User'}",
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'profile',
-                          child: Row(
-                            children: [
-                              Icon(Icons.person),
-                              SizedBox(width: 8),
-                              Text("My Profile"),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'logout',
-                          child: Row(
-                            children: [
-                              Icon(Icons.logout, color: Colors.red),
-                              SizedBox(width: 8),
-                              Text("Sign Out", style: TextStyle(color: Colors.red)),
-                            ],
-                          ),
-                        ),
-                      ],
                     ),
                 ],
               ),
 
-              // FIX: Single Body that switches based on index
               body: screens[_selectedIndex],
 
               bottomNavigationBar: NavigationBar(
                 selectedIndex: _selectedIndex,
                 onDestinationSelected: (i) => setState(() => _selectedIndex = i),
                 destinations: const [
-                  NavigationDestination(
-                    icon: Icon(
-                      Icons.dashboard_customize_outlined,
-                    ), // Changed icon to represent Dashboard
-                    label: "Home",
-                  ),
-                  NavigationDestination(icon: Icon(Icons.person), label: "Profile"),
+                  NavigationDestination(icon: Icon(Icons.grid_view_rounded), label: "Dashboard"),
+                  NavigationDestination(icon: Icon(Icons.person_outline_rounded), label: "Profile"),
                 ],
               ),
             ),
             
-            // ✅ Confetti Layer (Now properly placed in Stack)
             Align(
               alignment: Alignment.topCenter,
               child: ConfettiWidget(
@@ -271,98 +136,128 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
     );
   }
 
-  // Extracted the Dashboard content into a widget to allow switching
-  Widget _buildDashboardBody(NeuroSettings settings) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (_loadingStatus.isNotEmpty)
-              Text(_loadingStatus, style: const TextStyle(color: Colors.teal)),
+  Widget _buildZenDashboard(NeuroSettings settings) {
+    return SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        physics: const BouncingScrollPhysics(),
+        children: [
+          Text(
+            "Hi, ${settings.userName.isEmpty ? 'Friend' : settings.userName}",
+            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
 
-            Text(
-              "Namaste, ${settings.userName.isEmpty ? 'Friend' : settings.userName}",
-              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
+          // ✅ 1. XP Bar
+          _buildXpBar(settings),
+          const SizedBox(height: 20),
+          
+          // ✅ 2. Status Chips (Star Added)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _StatusChip(
+                  icon: Icons.star, 
+                  color: Colors.amber, 
+                  label: "Lvl ${settings.level}",
+                  onTap: () {}, 
+                ),
+                const SizedBox(width: 10),
+                _StatusChip(
+                  icon: Icons.local_fire_department, 
+                  color: Colors.orange, 
+                  label: "${settings.streakCount} Day Streak",
+                  onTap: () {},
+                ),
+                const SizedBox(width: 10),
+                _StatusChip(
+                  icon: settings.isOverwhelmed ? Icons.battery_alert : _getBatteryIcon(settings.energyLevel), 
+                  color: _getBatteryColor(settings.energyLevel), 
+                  label: "${(settings.energyLevel * 100).toInt()}% Energy",
+                  isOutline: true,
+                  onTap: () => _showBrainStateMenu(context, settings),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            _buildXpBar(settings), // 🔥 THIS WILL NOW AUTO-UPDATE
-            const SizedBox(height: 16),
-            const SizedBox(height: 8),
-            const Text(
-              "One step at a time.",
-              style: TextStyle(fontSize: 18, color: Colors.grey),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 48),
+          ),
+          
+          const SizedBox(height: 32),
+          
+          // ✅ 3. Full Width Cards
+          _HeroCard(
+            title: "Task Assistant",
+            subtitle: "Break down goals & chaos.",
+            icon: Icons.auto_awesome,
+            color: Colors.teal.shade50,
+            iconColor: Colors.teal,
+            isHighContrast: settings.highContrast,
+            onTap: () {
+              if (settings.useLocalModel && !ModelHolder.isModelLoaded) {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const ModelSetupScreen()));
+              } else {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const TaskBreakdownScreen()));
+              }
+            },
+          ),
+          const SizedBox(height: 16),
 
-            _HeroCard(
-              title: "Task Assistant",
-              subtitle: "Auto-Analyze Voice & Video",
-              icon: Icons.chat_bubble_outline_rounded,
-              color: Colors.teal.shade50,
-              iconColor: Colors.teal,
-              onTap: () {
-                final useLocal = settings.useLocalModel;
-                if (!useLocal) {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const TaskBreakdownScreen()));
-                  return;
-                }
-                if (!ModelHolder.isModelLoaded) {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ModelSetupScreen()));
-                } else {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const TaskBreakdownScreen()));
-                }
-              },
-            ),
+          _HeroCard(
+            title: "Body Double",
+            subtitle: "Stay focused. I'll watch the time.",
+            icon: Icons.support_agent,
+            color: Colors.purple.shade50,
+            iconColor: Colors.purple,
+            isHighContrast: settings.highContrast,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BodyDoubleScreen())),
+          ),
+          const SizedBox(height: 16),
+
+          // ✅ 4. AI Brain (Now Full Width)
+          _HeroCard(
+            title: "AI Brain Manager",
+            subtitle: ModelHolder.isModelLoaded ? "Active: Ready to think offline." : "Offline Mode: Tap to setup.",
+            icon: Icons.psychology,
+            color: Colors.blue.shade50,
+            iconColor: Colors.blue,
+            isHighContrast: settings.highContrast,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ModelSetupScreen())),
+          ),
+          
+          if (dotenv.env['ADMIN_EMAIL'] == settings.currentUser?.email) ...[
             const SizedBox(height: 24),
-
-            _HeroCard(
-              title: "Buddy",
-              subtitle: "Work together. No pressure.",
-              icon: Icons.people_outline,
-              color: Colors.purple.shade50,
-              iconColor: Colors.purple,
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BodyDoubleScreen())),
-            ),
-             const SizedBox(height: 24),
-             _HeroCard(
-              title: "AI Brain Manager",
-              subtitle: ModelHolder.isModelLoaded ? "   Active" : "⚙️ Manage Models",
-              icon: Icons.memory,
-              color: Colors.blue.shade50,
-              iconColor: Colors.blue,
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ModelSetupScreen())),
-            ),
+            Center(child: TextButton.icon(
+              icon: const Icon(Icons.terminal, size: 16),
+              label: const Text("Admin Logs"),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DebugLogScreen())),
+            ))
           ],
-        ),
+          const SizedBox(height: 40),
+        ],
       ),
-    ).animate().scale(duration: 300.ms, curve: Curves.easeOutBack);
+    ).animate().fadeIn(duration: 500.ms);
   }
 
   Widget _buildXpBar(NeuroSettings settings) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text("Lvl ${settings.level}", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
-              Text("${settings.xp} / ${settings.xpToNextLevel} XP", style: const TextStyle(color: Colors.grey, fontSize: 12)),
-            ],
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text("Level ${settings.level}", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
+            Text("${settings.xp} / ${settings.xpToNextLevel} XP", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+          ],
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 6),
         LinearPercentIndicator(
-          lineHeight: 10.0,
+          lineHeight: 8.0,
           percent: settings.levelProgress.clamp(0.0, 1.0),
           backgroundColor: Colors.grey.shade200,
           progressColor: Colors.teal,
           barRadius: const Radius.circular(10),
-          animation: true, 
+          padding: EdgeInsets.zero,
+          animation: true,
           animationDuration: 800,
         ),
       ],
@@ -385,43 +280,29 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
   void _showBrainStateMenu(BuildContext context, NeuroSettings settings) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) {
-        // ✅ FIX: Added SafeArea here to prevent bottom menu from being hidden by system navigation
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(24.0),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  "Brain Battery Check 🔋",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
+                const Text("Brain Battery Check 🔋", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 20),
-
                 const Text("How much energy do you have?"),
                 Slider(
                   value: settings.energyLevel,
-                  min: 0.0,
-                  max: 1.0,
-                  divisions: 5,
+                  min: 0.0, max: 1.0, divisions: 5,
                   activeColor: _getBatteryColor(settings.energyLevel),
                   label: "${(settings.energyLevel * 100).toInt()}%",
                   onChanged: (val) => settings.setEnergy(val),
                 ),
-
-                const SizedBox(height: 10),
-
                 SwitchListTile(
                   title: const Text("I am Overwhelmed"),
                   subtitle: const Text("Switch to 'Panic Mode' (Gentler AI)"),
                   value: settings.isOverwhelmed,
                   activeColor: Colors.pink,
-                  contentPadding: EdgeInsets.zero,
                   onChanged: (val) {
                     settings.setOverwhelm(val);
                     Navigator.pop(ctx);
@@ -436,6 +317,38 @@ class _SmartDashboardScreenState extends State<SmartDashboardScreen> {
   }
 }
 
+class _StatusChip extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label;
+  final bool isOutline;
+  final VoidCallback onTap;
+
+  const _StatusChip({required this.icon, required this.color, required this.label, required this.onTap, this.isOutline = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isOutline ? Colors.transparent : color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withOpacity(0.5), width: 1.5),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(width: 6),
+            Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: color.withOpacity(0.9), fontSize: 13)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _HeroCard extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -443,36 +356,60 @@ class _HeroCard extends StatelessWidget {
   final Color color;
   final Color iconColor;
   final VoidCallback onTap;
+  final bool isHighContrast;
+  final double? height; 
 
-  const _HeroCard({required this.title, required this.subtitle, required this.icon, required this.color, required this.iconColor, required this.onTap});
+  const _HeroCard({
+    required this.title, required this.subtitle, required this.icon, required this.color, required this.iconColor, required this.onTap,
+    this.isHighContrast = false, this.height,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final finalBg = isHighContrast ? Colors.white : color;
+    final finalIcon = isHighContrast ? Colors.black : iconColor;
+    final border = isHighContrast ? Border.all(color: Colors.black, width: 3) : null;
+    final titleStyle = TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: isHighContrast ? Colors.black : Colors.black87);
+
     return Container(
-      height: 140,
+      height: height, 
+      constraints: const BoxConstraints(minHeight: 120), 
       decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
+        color: finalBg,
+        borderRadius: BorderRadius.circular(24),
+        border: border,
+        boxShadow: isHighContrast ? [] : [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(30),
+          borderRadius: BorderRadius.circular(24),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             child: Row(
               children: [
-                Icon(icon, size: 36, color: iconColor),
-                const SizedBox(width: 24),
+                Icon(icon, size: 32, color: finalIcon),
+                const SizedBox(width: 16),
                 Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                      Text(subtitle, style: const TextStyle(fontSize: 15)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min, 
+                    children: [
+                      Flexible( 
+                        child: Text(title, style: titleStyle, overflow: TextOverflow.ellipsis),
+                      ),
+                      if (subtitle.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Flexible( 
+                          child: Text(subtitle, style: TextStyle(fontSize: 13, color: isHighContrast ? Colors.black : Colors.black54, height: 1.2), maxLines: 3, overflow: TextOverflow.ellipsis),
+                        )
+                      ]
                     ],
                   ),
                 ),
+                Icon(Icons.arrow_forward_ios, size: 14, color: isHighContrast ? Colors.black : Colors.black26),
               ],
             ),
           ),

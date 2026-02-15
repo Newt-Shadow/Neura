@@ -27,7 +27,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         padding: const EdgeInsets.all(24),
         children: [
           const Text(
-            "Welcome to Neura!",
+            "Welcome to Neuro!",
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.teal),
           ),
           const SizedBox(height: 8),

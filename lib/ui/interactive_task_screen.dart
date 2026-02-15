@@ -205,7 +205,7 @@ class _InteractiveTaskScreenState extends State<InteractiveTaskScreen> {
             ),
             
             ListTile(
-              leading: const Icon(Icons.volunteer_activism, color: Colors.grey),
+              leading: const Icon(Icons.health_and_safety, color: Colors.grey),
               title: const Text("Panic Mode"),
               onTap: () {
                 Navigator.pop(context);

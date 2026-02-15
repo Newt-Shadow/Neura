@@ -1,4 +1,4 @@
-# Neura: The Neurodivergent-First AI Assistant 
+# Neuro: The Neurodivergent-First AI Assistant 
 
 > **Empowering minds with ADHD, Autism, Dyslexia, and Anxiety through Offline AI and Executive Function Prosthetics.**
 
@@ -10,7 +10,7 @@
 ---
 
 ## 📖 Table of Contents
-- [Neura: The Neurodivergent-First AI Assistant](#neura-the-neurodivergent-first-ai-assistant)
+- [Neuro: The Neurodivergent-First AI Assistant](#neuro-the-neurodivergent-first-ai-assistant)
   - [📖 Table of Contents](#-table-of-contents)
   - [💡 About The Project](#-about-the-project)
   - [🌟 Key Features](#-key-features)
@@ -33,16 +33,16 @@
 
 ## 💡 About The Project
 
-**Neura** is not just another to-do list; it is an **Executive Function Prosthesis**.
+**Neuro** is not just another to-do list; it is an **Executive Function Prosthesis**.
 
 For individuals with neurodivergent conditions (ADHD, Autism, Dyslexia, Anxiety), the gap between *intent* ("I need to clean my room") and *action* is often paralyzed by overwhelm, sensory issues, or executive dysfunction.
 
-Neura bridges this gap using a **Hybrid AI Approach**:
+Neuro bridges this gap using a **Hybrid AI Approach**:
 1.  **Visual Intelligence:** Users snap a photo of their "chaos" (messy room, confusing document).
 2.  **Contextual Analysis:** The AI identifies objects and context.
 3.  **Micro-Tasking:** It breaks the scene down into tiny, dopamine-rewarding steps adapted to the user's specific neuro-profile (e.g., "Gamified" for ADHD, "Literal" for Autism).
 
-**Uniquely, Neura features an "Offline Brain" capability, allowing it to function privately and without internet using on-device Large Language Models.**
+**Uniquely, Neuro features an "Offline Brain" capability, allowing it to function privately and without internet using on-device Large Language Models.**
 
 ---
 
@@ -53,7 +53,7 @@ Neura bridges this gap using a **Hybrid AI Approach**:
 * **Offline Mode (Beta):** Runs a quantized **Gemma 2B** model locally on the device's NPU/GPU. No internet required.
 
 ### 2. 👁️ Visual & Voice Deconstruction
-* **See It:** Don't know where to start? Just take a picture. Neura sees "a pile of laundry" and converts it into: *"Step 1: Find all the socks."*
+* **See It:** Don't know where to start? Just take a picture. Neuro sees "a pile of laundry" and converts it into: *"Step 1: Find all the socks."*
 * **Say It:** Overwhelmed? Just speak your mind. The AI listens and organizes your verbal brain dump into a clear checklist.
 
 ### 3. 🧬 Dynamic Neuro-Adaptation
@@ -127,17 +127,17 @@ Follow these steps to run the source code on your local machine.
 
 ## 🐳 Running with Docker (Web + Android Host)
 
-We provide a specialized Docker setup that serves both the **Web Version** of Neura and hosts the **Android APK** for easy download to your mobile device.
+We provide a specialized Docker setup that serves both the **Web Version** of Neuro and hosts the **Android APK** for easy download to your mobile device.
 
 1.  **Build the Image**
     ```bash
-    docker build -t neura-app .
+    docker build -t neuro-app .
     ```
 
 2.  **Run the Container (Interactive Mode)**
     * **Note:** You must use the `-it` flag to see the interactive menu and download instructions.
     ```bash
-    docker run -it -p 8080:80 --name neura-container neura-app
+    docker run -it -p 8080:80 --name neuro-container neuro-app
     ```
 
 3.  **Interactive Launch Menu**
@@ -149,8 +149,8 @@ We provide a specialized Docker setup that serves both the **Web Version** of Ne
 4.  **Access the App**
     * **🖥️ Web App:** Open `http://localhost:8080` in Chrome.
     * **📱 Android APK:**
-        * **On PC:** Download directly from `http://localhost:8080/neura.apk`
-        * **On Phone:** Connect your phone to the same Wi-Fi as your PC, find your PC's Local IP (e.g., `192.168.1.5`), and visit `http://192.168.1.5:8080/neura.apk`.
+        * **On PC:** Download directly from `http://localhost:8080/neuro.apk`
+        * **On Phone:** Connect your phone to the same Wi-Fi as your PC, find your PC's Local IP (e.g., `192.168.1.5`), and visit `http://192.168.1.5:8080/neuro.apk`.
 
 > **Note:** The Web version running in Docker defaults to **Cloud Mode** (API) to ensure stability, as browser-based local LLMs require specific hardware acceleration (WebGPU) that is difficult to virtualize in standard containers.
 ---

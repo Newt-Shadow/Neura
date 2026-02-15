@@ -32,9 +32,9 @@ RUN flutter build apk --release
 FROM nginx:alpine
 
 # Metadata
-LABEL maintainer="Neura Team"
+LABEL maintainer="Neuro Team"
 LABEL version="1.0"
-LABEL description="Neura AI Assistant - Web & Android Host"
+LABEL description="Neuro AI Assistant - Web & Android Host"
 
 # 1. Install utilities for the entrypoint script (Bash for logic, iproute2 for IP detection)
 RUN apk add --no-cache bash iproute2 ncurses
@@ -48,7 +48,7 @@ RUN rm -rf ./*
 COPY --from=build /app/build/web ./
 
 # 4. Copy Android APK & Rename
-COPY --from=build /app/build/app/outputs/flutter-apk/app-release.apk ./neura.apk
+COPY --from=build /app/build/app/outputs/flutter-apk/app-release.apk ./neuro.apk
 
 # 5. Copy Custom Configurations
 COPY nginx.conf /etc/nginx/conf.d/default.conf

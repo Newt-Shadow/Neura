@@ -46,7 +46,7 @@ class MockNeuroSettings extends NeuroSettings {
 
 void main() {
   // ✅ TEST 1: Verifies the UI adapts to Neuro-Inclusive settings
-  testWidgets('Neura UI Adaptation Test - Dyslexia Mode', (WidgetTester tester) async {
+  testWidgets('Neuro UI Adaptation Test - Dyslexia Mode', (WidgetTester tester) async {
     // 1. Setup the Mock
     final mockSettings = MockNeuroSettings();
 

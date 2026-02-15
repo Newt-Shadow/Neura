@@ -20,7 +20,7 @@ class _DebugLogScreenState extends State<DebugLogScreen> {
       backgroundColor: const Color(0xFF0D1117), // GitHub Dark Dimmed
       appBar: AppBar(
         backgroundColor: const Color(0xFF161B22),
-        title: const Text("Neura Neural Link", style: TextStyle(color: Colors.greenAccent, fontFamily: 'Courier')),
+        title: const Text("Neuro Neural Link", style: TextStyle(color: Colors.greenAccent, fontFamily: 'Courier')),
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
