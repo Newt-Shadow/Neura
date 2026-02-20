@@ -47,6 +47,8 @@ dependencies:
   percent_indicator: ^4.2.3
   animated_text_kit: ^4.2.2
   audioplayers: ^6.0.0
+  file_picker : ^8.0.0
+
   
 
 

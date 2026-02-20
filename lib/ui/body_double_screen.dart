@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:confetti/confetti.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart'; // ✅ Added for PDF
 import 'dart:typed_data';
 import 'package:image/image.dart' as img;
 import 'package:audioplayers/audioplayers.dart';
@@ -31,6 +32,12 @@ class _BodyDoubleScreenState extends State<BodyDoubleScreen>
   late ConfettiController _confettiController;
   final ImagePicker _picker = ImagePicker();
   final AudioPlayer _musicPlayer = AudioPlayer();
+
+  // 📂 STUDIO STATE
+  Uint8List? _selectedFileBytes;
+  String _selectedMimeType = "image/jpeg";
+  bool _isGeneratingPodcast = false;
+  bool _isPodcastPlaying = false;
 
   // 🧠 SMART STATE
   bool _isActive = false;
@@ -74,7 +81,7 @@ class _BodyDoubleScreenState extends State<BodyDoubleScreen>
 
   final Map<String, String> _tracks = {
     "Brown Noise (Focus)":
-        "https://raw.githubusercontent.com/anars/blank-audio/master/10-minutes-of-silence.mp3", // Replace with valid direct stream if needed
+        "https://raw.githubusercontent.com/anars/blank-audio/master/10-minutes-of-silence.mp3",
     "Lo-Fi Beats (Chill)":
         "https://codeskulptor-demos.commondatastorage.googleapis.com/GalaxyInvaders/theme_01.mp3",
     "RPG Dungeon (Dark)":
@@ -110,11 +117,6 @@ class _BodyDoubleScreenState extends State<BodyDoubleScreen>
       "persona": "Drill Sergeant",
     },
   ];
-
-  // 📸 PODCAST STATE
-  Uint8List? _podcastImageBytes;
-  bool _isGeneratingPodcast = false;
-  bool _isPodcastPlaying = false;
 
   @override
   void initState() {
@@ -195,7 +197,6 @@ class _BodyDoubleScreenState extends State<BodyDoubleScreen>
 
     _analyzeContext(_taskController.text);
 
-    // Auto-Dynamic Tuning
     if (quickTask == null) {
       if (_currentContext == TaskType.physical) {
         _selectedPersona = "Drill Sergeant";
@@ -276,9 +277,6 @@ class _BodyDoubleScreenState extends State<BodyDoubleScreen>
     _speakAI("Checking in.", isPrompt: true);
   }
 
-  // =================================================================
-  // 🎵 AUDIO PLAYER (SINGLE DEFINITION)
-  // =================================================================
   Future<void> _toggleMusic(String trackName) async {
     final url = _tracks[trackName];
     if (url == null) return;
@@ -353,7 +351,7 @@ class _BodyDoubleScreenState extends State<BodyDoubleScreen>
   // =================================================================
   void _openPodcastMenu() {
     TextEditingController textInput = TextEditingController();
-    _podcastImageBytes = null;
+    _selectedFileBytes = null;
 
     showModalBottomSheet(
       context: context,
@@ -422,47 +420,41 @@ class _BodyDoubleScreenState extends State<BodyDoubleScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (_podcastImageBytes != null)
-                        Stack(
-                          children: [
-                            Container(
-                              height: 180,
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                                image: DecorationImage(
-                                  image: MemoryImage(_podcastImageBytes!),
-                                  fit: BoxFit.cover,
+                      if (_selectedFileBytes != null)
+                        Container(
+                          height: 100,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.teal.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.teal.shade200),
+                          ),
+                          child: Stack(
+                            children: [
+                              Center(
+                                child: Text(
+                                  _selectedMimeType.contains("pdf")
+                                      ? "📄 PDF File Loaded"
+                                      : "🖼️ Image File Loaded",
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.teal),
                                 ),
                               ),
-                            ),
-                            Positioned(
-                              top: 10,
-                              right: 10,
-                              child: CircleAvatar(
-                                backgroundColor: Colors.white,
+                              Positioned(
+                                top: 5,
+                                right: 5,
                                 child: IconButton(
-                                  icon: const Icon(
-                                    Icons.close,
-                                    color: Colors.red,
-                                  ),
+                                  icon: const Icon(Icons.close, color: Colors.red),
                                   onPressed: () => setSheetState(
-                                    () => _podcastImageBytes = null,
-                                  ),
+                                      () => _selectedFileBytes = null),
                                 ),
-                              ),
-                            ),
-                          ],
+                              )
+                            ],
+                          ),
                         ).animate().scale(),
 
-                      if (_podcastImageBytes == null)
+                      if (_selectedFileBytes == null)
                         Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
@@ -472,14 +464,11 @@ class _BodyDoubleScreenState extends State<BodyDoubleScreen>
                           ),
                           child: const Column(
                             children: [
-                              Icon(
-                                Icons.auto_awesome,
-                                size: 40,
-                                color: Colors.amber,
-                              ),
+                              Icon(Icons.auto_awesome,
+                                  size: 40, color: Colors.amber),
                               SizedBox(height: 10),
                               Text(
-                                "I can turn your study notes into a podcast. Just paste text or snap a photo.",
+                                "I can turn your study notes into a podcast. Just paste text, snap a photo, or upload a PDF.",
                                 textAlign: TextAlign.center,
                                 style: TextStyle(color: Colors.grey),
                               ),
@@ -497,7 +486,7 @@ class _BodyDoubleScreenState extends State<BodyDoubleScreen>
                               maxLines: 4,
                               minLines: 1,
                               decoration: InputDecoration(
-                                hintText: "Paste text or topic here...",
+                                hintText: "Optional topic or instructions...",
                                 filled: true,
                                 fillColor: Colors.grey.shade100,
                                 border: OutlineInputBorder(
@@ -508,22 +497,21 @@ class _BodyDoubleScreenState extends State<BodyDoubleScreen>
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          InkWell(
-                            onTap: () => _pickPodcastImage(setSheetState),
-                            borderRadius: BorderRadius.circular(16),
-                            child: Container(
-                              width: 56,
-                              height: 56,
-                              decoration: BoxDecoration(
-                                color: _getPersonaColor().withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Icon(
-                                Icons.camera_alt_rounded,
-                                color: _getPersonaColor(),
-                              ),
-                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _FilePickButton(
+                            icon: Icons.camera_alt,
+                            label: "Camera",
+                            onTap: () => _pickImage(setSheetState),
+                          ),
+                          _FilePickButton(
+                            icon: Icons.picture_as_pdf,
+                            label: "PDF",
+                            onTap: () => _pickPDF(setSheetState),
                           ),
                         ],
                       ),
@@ -543,10 +531,9 @@ class _BodyDoubleScreenState extends State<BodyDoubleScreen>
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, -4),
-                    ),
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, -4)),
                   ],
                 ),
                 child: SizedBox(
@@ -556,52 +543,21 @@ class _BodyDoubleScreenState extends State<BodyDoubleScreen>
                     onPressed: _isGeneratingPodcast
                         ? null
                         : () {
-                            String promptText = textInput.text.trim();
-
-                            // Fallback if text is empty but image is present
-                            if (promptText.isEmpty &&
-                                _podcastImageBytes != null) {
-                              promptText = "The content in this image";
-                            }
-
-                            if (promptText.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    "Please enter a topic or snap a photo.",
-                                  ),
-                                ),
-                              );
-                              return;
-                            }
-
-                            Navigator.pop(context); // Close the input menu
-                            _generateAndPlayPodcast(promptText);
+                            Navigator.pop(context); // Close sheet
+                            _generateAndPlayPodcast(textInput.text);
                           },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _getPersonaColor(),
                       foregroundColor: Colors.white,
-                      elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
                     child: _isGeneratingPodcast
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 3,
-                            ),
-                          )
-                        : const Text(
-                            "Generate Audio",
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text("Enter Knowledge Studio",
                             style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                                fontSize: 18, fontWeight: FontWeight.bold)),
                   ),
                 ),
               ),
@@ -612,15 +568,36 @@ class _BodyDoubleScreenState extends State<BodyDoubleScreen>
     );
   }
 
-  // Update this method in your BodyDoubleScreen class
+  Future<void> _pickImage(StateSetter setSheetState) async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.camera);
+    if (image != null) {
+      final bytes = await image.readAsBytes();
+      setSheetState(() {
+        _selectedFileBytes = bytes;
+        _selectedMimeType = "image/jpeg";
+      });
+    }
+  }
+
+  Future<void> _pickPDF(StateSetter setSheetState) async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+    );
+    if (result != null) {
+      setSheetState(() {
+        _selectedFileBytes = result.files.first.bytes;
+        _selectedMimeType = "application/pdf";
+      });
+    }
+  }
+
   void _generateAndPlayPodcast(String textInput) async {
     setState(() => _isGeneratingPodcast = true);
 
-    // 1. Ensure we tell the AI exactly what to look at if text is empty
     String finalTopic = textInput.trim();
-    if (finalTopic.isEmpty && _podcastImageBytes != null) {
-      finalTopic =
-          "Analyze the provided image in extreme detail, transcribing any text or code and explaining its full purpose and logic.";
+    if (finalTopic.isEmpty && _selectedFileBytes != null) {
+      finalTopic = "Analyze and teach the logic within this document.";
     }
 
     final prompt = StudioPromptBuilder.buildPodcastPrompt(
@@ -631,148 +608,111 @@ class _BodyDoubleScreenState extends State<BodyDoubleScreen>
     );
 
     try {
-      final script = await RemoteStudioService.generateStudioContent(
+      final result = await RemoteStudioService.generateStudioContent(
         prompt: prompt,
-        imageBytes: _podcastImageBytes,
+        fileBytes: _selectedFileBytes,
+        mimeType: _selectedMimeType,
       );
 
       if (mounted) {
-        // 2. STOP everything else immediately
-        await _tts.stop();
-        if (_isPlayingMusic) await _musicPlayer.setVolume(0.1);
-
         setState(() {
           _isGeneratingPodcast = false;
           _isPodcastPlaying = true;
         });
-
-        _showActivePlayer(script);
-        _playPodcastAudio(script);
+        await _tts.stop();
+        _showFullStudioPage(result['script']!, result['summary']!);
+        _playPodcastAudio(result['script']!);
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isGeneratingPodcast = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Connection failed. Check API key.")),
+          const SnackBar(content: Text("Analysis failed. Check internet.")),
         );
       }
     }
   }
 
-  // Ensure the actual audio play call is awaited and clean
-  void _playPodcastAudio(String script) async {
-    await _tts.stop(); // Double-check stop
-    await _setPersonaVoice();
-    if (script.isNotEmpty) {
-      await _tts.speak(script);
-    }
-  }
-
-  void _showActivePlayer(String script) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true, // ✅ Ensures it stays above the Android nav bar
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-      ),
-      builder: (ctx) => Container(
-        // Allow the sheet to be tall enough to see everything
-        height: MediaQuery.of(context).size.height * 0.7,
-        padding: const EdgeInsets.fromLTRB(
-          24,
-          12,
-          24,
-          40,
-        ), // ✅ Bottom padding for the button
-        child: Column(
-          children: [
-            // Drag Handle
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 25),
-
-            const Icon(Icons.graphic_eq, size: 50, color: Colors.blueAccent)
-                .animate(onPlay: (c) => c.repeat(reverse: true))
-                .scale(duration: 1000.ms),
-
-            const SizedBox(height: 15),
-            Text(
-              "Podcast: $_selectedPersona",
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-            ),
-            const SizedBox(height: 20),
-
-            // Script View
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Text(
-                  script,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    height: 1.5,
-                    color: Colors.black87,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Action Button (Stop)
-            SizedBox(
-              width: double.infinity,
-              height: 60,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.redAccent,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
+  void _showFullStudioPage(String script, String summary) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          backgroundColor: Colors.white,
+          appBar: AppBar(
+            title: const Text("Knowledge Base"),
+            backgroundColor: _getPersonaColor().withOpacity(0.1),
+            leading: IconButton(
+                icon: const Icon(Icons.close),
                 onPressed: () {
                   _tts.stop();
-                  if (_isPlayingMusic) _musicPlayer.setVolume(1.0);
                   Navigator.pop(context);
-                },
-                icon: const Icon(Icons.stop),
-                label: const Text(
-                  "STOP LISTENING",
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                }),
+          ),
+          body: Column(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                color: _getPersonaColor().withOpacity(0.05),
+                child: Column(
+                  children: [
+                    const Icon(Icons.graphic_eq,
+                            size: 50, color: Colors.blueAccent)
+                        .animate(onPlay: (c) => c.repeat(reverse: true))
+                        .scale(),
+                    const SizedBox(height: 8),
+                    Text("Listening to $_selectedPersona",
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ],
                 ),
               ),
-            ),
-          ],
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("CORE CONCEPTS",
+                          style: TextStyle(
+                              color: Colors.grey,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2)),
+                      const SizedBox(height: 16),
+                      SelectableText(summary,
+                          style: const TextStyle(fontSize: 16, height: 1.6)),
+                    ],
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: const BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)]),
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    _tts.stop();
+                  },
+                  icon: const Icon(Icons.stop),
+                  label: const Text("STOP AUDIO"),
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent,
+                      minimumSize: const Size(double.infinity, 60)),
+                ),
+              )
+            ],
+          ),
         ),
       ),
     );
   }
 
-  
-
-  Future<void> _pickPodcastImage(StateSetter setSheetState) async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.camera);
-    if (image != null) {
-      final bytes = await image.readAsBytes();
-      final decoded = img.decodeImage(bytes);
-      if (decoded != null) {
-        final resized = img.copyResize(decoded, width: 800);
-        final compressed = Uint8List.fromList(
-          img.encodeJpg(resized, quality: 70),
-        );
-        setSheetState(() => _podcastImageBytes = compressed);
-        setState(() => _podcastImageBytes = compressed);
-      }
+  void _playPodcastAudio(String script) async {
+    if (_isPlayingMusic) await _musicPlayer.setVolume(0.1);
+    await _setPersonaVoice();
+    if (script.isNotEmpty) {
+      await _tts.speak(script);
     }
   }
 
@@ -780,36 +720,25 @@ class _BodyDoubleScreenState extends State<BodyDoubleScreen>
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              "🎭 Choose Your Buddy",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            ..._personas.keys.map(
-              (p) => ListTile(
-                leading: Icon(
-                  Icons.face,
-                  color: _selectedPersona == p
-                      ? _getPersonaColor()
-                      : Colors.grey,
-                ),
-                title: Text(p),
-                subtitle: Text(_personas[p]!),
-                onTap: () {
-                  setState(() => _selectedPersona = p);
-                  Navigator.pop(context);
-                  _speakAI("Persona updated.");
-                },
-              ),
-            ),
-          ],
+          children: _personas.keys
+              .map((p) => ListTile(
+                    leading: Icon(Icons.face,
+                        color: _selectedPersona == p
+                            ? _getPersonaColor()
+                            : Colors.grey),
+                    title: Text(p),
+                    onTap: () {
+                      setState(() => _selectedPersona = p);
+                      Navigator.pop(context);
+                      _speakAI("Persona updated.");
+                    },
+                  ))
+              .toList(),
         ),
       ),
     );
@@ -825,22 +754,16 @@ class _BodyDoubleScreenState extends State<BodyDoubleScreen>
             centerTitle: true,
             actions: [
               IconButton(
-                icon: const Icon(Icons.theater_comedy),
-                onPressed: _showPersonaSelector,
-                tooltip: "Change Persona",
-              ),
+                  icon: const Icon(Icons.theater_comedy),
+                  onPressed: _showPersonaSelector),
               Padding(
                 padding: const EdgeInsets.only(right: 20),
-                child:
-                    Icon(
-                          Icons.circle,
-                          color: _isActive ? Colors.green : Colors.grey,
-                          size: 12,
-                        )
-                        .animate(target: _isActive ? 1 : 0)
-                        .fadeIn()
-                        .then()
-                        .shimmer(duration: 2000.ms),
+                child: Icon(Icons.circle,
+                        color: _isActive ? Colors.green : Colors.grey, size: 12)
+                    .animate(target: _isActive ? 1 : 0)
+                    .fadeIn()
+                    .then()
+                    .shimmer(duration: 2000.ms),
               ),
             ],
           ),
@@ -853,147 +776,91 @@ class _BodyDoubleScreenState extends State<BodyDoubleScreen>
                   children: [
                     GestureDetector(
                       onTap: _isActive ? _stopSession : null,
-                      child:
-                          Container(
-                                width: 220,
-                                height: 220,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: _isActive
-                                      ? _getPersonaColor().withOpacity(0.1)
-                                      : Colors.grey.shade50,
-                                  border: Border.all(
-                                    color: _isActive
-                                        ? _getPersonaColor()
-                                        : Colors.grey.shade300,
-                                    width: 4,
-                                  ),
-                                ),
-                                child: Center(
-                                  child: Icon(
-                                    _isActive
-                                        ? Icons.face
-                                        : Icons.face_retouching_off,
-                                    size: 80,
-                                    color: _isActive
-                                        ? _getPersonaColor()
-                                        : Colors.grey.shade400,
-                                  ),
-                                ),
-                              )
-                              .animate(target: _isActive ? 1 : 0)
-                              .scale(duration: 500.ms),
+                      child: Container(
+                        width: 220,
+                        height: 220,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _isActive
+                              ? _getPersonaColor().withOpacity(0.1)
+                              : Colors.grey.shade50,
+                          border: Border.all(
+                            color: _isActive ? _getPersonaColor() : Colors.grey.shade300,
+                            width: 4,
+                          ),
+                        ),
+                        child: Center(
+                          child: Icon(
+                            _isActive ? Icons.face : Icons.face_retouching_off,
+                            size: 80,
+                            color: _isActive ? _getPersonaColor() : Colors.grey.shade400,
+                          ),
+                        ),
+                      ).animate(target: _isActive ? 1 : 0).scale(duration: 500.ms),
                     ),
                     const SizedBox(height: 40),
-
                     if (!_isActive) ...[
-                      // Quick Start Grid
                       Wrap(
                         spacing: 12,
                         runSpacing: 12,
                         alignment: WrapAlignment.center,
                         children: _quickActions
-                            .map(
-                              (action) => ActionChip(
-                                avatar: Icon(
-                                  action['icon'],
-                                  size: 18,
-                                  color: _getPersonaColor(),
-                                ),
-                                label: Text(action['label']),
-                                backgroundColor: Colors.white,
-                                side: BorderSide(color: Colors.grey.shade200),
-                                elevation: 1,
-                                onPressed: () => _startSession(
-                                  action['label'],
-                                  action['track'],
-                                  action['persona'],
-                                ),
-                              ),
-                            )
+                            .map((action) => ActionChip(
+                                  label: Text(action['label']),
+                                  onPressed: () => _startSession(action['label'],
+                                      action['track'], action['persona']),
+                                ))
                             .toList(),
                       ),
                       const SizedBox(height: 30),
-                      // ... TextField ...
                       TextField(
                         controller: _taskController,
                         textAlign: TextAlign.center,
                         style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
+                            fontSize: 20, fontWeight: FontWeight.bold),
                         decoration: const InputDecoration(
-                          hintText: "Or type custom task...",
-                          border: InputBorder.none,
-                          hintStyle: TextStyle(color: Colors.black26),
-                        ),
+                            hintText: "Or type custom task...",
+                            border: InputBorder.none),
                       ),
                     ] else ...[
-                      Text(
-                        _taskController.text,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
+                      Text(_taskController.text,
+                          style: const TextStyle(
+                              fontSize: 24, fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center),
                       const SizedBox(height: 20),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           _ToolButton(
-                            icon: Icons.mic,
-                            label: "Studio",
-                            color: _getPersonaColor(),
-                            onTap: _openPodcastMenu,
-                          ),
+                              icon: Icons.mic,
+                              label: "Studio",
+                              color: _getPersonaColor(),
+                              onTap: _openPodcastMenu),
                           const SizedBox(width: 12),
                           _ToolButton(
-                            icon: _isPlayingMusic
-                                ? Icons.graphic_eq
-                                : Icons.music_note,
-                            label: "Music",
-                            color: Colors.orange,
-                            onTap: _showMusicSelector,
-                          ),
+                              icon: _isPlayingMusic
+                                  ? Icons.graphic_eq
+                                  : Icons.music_note,
+                              label: "Music",
+                              color: Colors.orange,
+                              onTap: _showMusicSelector),
                         ],
                       ),
                     ],
-
                     const SizedBox(height: 30),
-                    if (!_isActive)
-                      SizedBox(
-                        width: double.infinity,
-                        height: 60,
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.play_arrow),
-                          label: const Text("Start Session"),
-                          style: ElevatedButton.styleFrom(
+                    SizedBox(
+                      width: double.infinity,
+                      height: 60,
+                      child: ElevatedButton(
+                        onPressed: _isActive ? _stopSession : () => _startSession(),
+                        style: ElevatedButton.styleFrom(
                             backgroundColor: _getPersonaColor(),
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          onPressed: () => _startSession(),
-                        ),
-                      )
-                    else
-                      SizedBox(
-                        width: double.infinity,
-                        height: 60,
-                        child: OutlinedButton(
-                          onPressed: _stopSession,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.red,
-                            side: const BorderSide(color: Colors.red),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          child: const Text("End Session"),
-                        ),
+                                borderRadius: BorderRadius.circular(16))),
+                        child: Text(_isActive ? "End Session" : "Start Session"),
                       ),
+                    ),
                   ],
                 ),
               ),
@@ -1040,14 +907,37 @@ class _ToolButton extends StatelessWidget {
           children: [
             Icon(icon, size: 20, color: color),
             const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
-            ),
+            Text(label,
+                style: TextStyle(
+                    color: color, fontWeight: FontWeight.bold, fontSize: 14)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FilePickButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  const _FilePickButton(
+      {required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+            color: Colors.grey.shade100, borderRadius: BorderRadius.circular(16)),
+        child: Column(
+          children: [
+            Icon(icon, color: Colors.blueGrey),
+            const SizedBox(height: 4),
+            Text(label, style: const TextStyle(fontSize: 12))
           ],
         ),
       ),
